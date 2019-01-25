@@ -104,6 +104,8 @@ venv.bak/
 
 
 ## Coin: 
-gtFine_trainvaltest.zip
-gtFine/
+data/
+play.py
+preprocess_data.py
+res/
 

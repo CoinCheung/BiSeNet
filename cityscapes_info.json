@@ -1,0 +1,492 @@
+[
+  {
+    "hasInstances": false,
+    "category": "void",
+    "catid": 0,
+    "name": "unlabeled",
+    "ignoreInEval": true,
+    "id": 0,
+    "color": [
+      0,
+      0,
+      0
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "void",
+    "catid": 0,
+    "name": "ego vehicle",
+    "ignoreInEval": true,
+    "id": 1,
+    "color": [
+      0,
+      0,
+      0
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "void",
+    "catid": 0,
+    "name": "rectification border",
+    "ignoreInEval": true,
+    "id": 2,
+    "color": [
+      0,
+      0,
+      0
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "void",
+    "catid": 0,
+    "name": "out of roi",
+    "ignoreInEval": true,
+    "id": 3,
+    "color": [
+      0,
+      0,
+      0
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "void",
+    "catid": 0,
+    "name": "static",
+    "ignoreInEval": true,
+    "id": 4,
+    "color": [
+      0,
+      0,
+      0
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "void",
+    "catid": 0,
+    "name": "dynamic",
+    "ignoreInEval": true,
+    "id": 5,
+    "color": [
+      111,
+      74,
+      0
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "void",
+    "catid": 0,
+    "name": "ground",
+    "ignoreInEval": true,
+    "id": 6,
+    "color": [
+      81,
+      0,
+      81
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "flat",
+    "catid": 1,
+    "name": "road",
+    "ignoreInEval": false,
+    "id": 7,
+    "color": [
+      128,
+      64,
+      128
+    ],
+    "trainId": 0
+  },
+  {
+    "hasInstances": false,
+    "category": "flat",
+    "catid": 1,
+    "name": "sidewalk",
+    "ignoreInEval": false,
+    "id": 8,
+    "color": [
+      244,
+      35,
+      232
+    ],
+    "trainId": 1
+  },
+  {
+    "hasInstances": false,
+    "category": "flat",
+    "catid": 1,
+    "name": "parking",
+    "ignoreInEval": true,
+    "id": 9,
+    "color": [
+      250,
+      170,
+      160
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "flat",
+    "catid": 1,
+    "name": "rail track",
+    "ignoreInEval": true,
+    "id": 10,
+    "color": [
+      230,
+      150,
+      140
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "construction",
+    "catid": 2,
+    "name": "building",
+    "ignoreInEval": false,
+    "id": 11,
+    "color": [
+      70,
+      70,
+      70
+    ],
+    "trainId": 2
+  },
+  {
+    "hasInstances": false,
+    "category": "construction",
+    "catid": 2,
+    "name": "wall",
+    "ignoreInEval": false,
+    "id": 12,
+    "color": [
+      102,
+      102,
+      156
+    ],
+    "trainId": 3
+  },
+  {
+    "hasInstances": false,
+    "category": "construction",
+    "catid": 2,
+    "name": "fence",
+    "ignoreInEval": false,
+    "id": 13,
+    "color": [
+      190,
+      153,
+      153
+    ],
+    "trainId": 4
+  },
+  {
+    "hasInstances": false,
+    "category": "construction",
+    "catid": 2,
+    "name": "guard rail",
+    "ignoreInEval": true,
+    "id": 14,
+    "color": [
+      180,
+      165,
+      180
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "construction",
+    "catid": 2,
+    "name": "bridge",
+    "ignoreInEval": true,
+    "id": 15,
+    "color": [
+      150,
+      100,
+      100
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "construction",
+    "catid": 2,
+    "name": "tunnel",
+    "ignoreInEval": true,
+    "id": 16,
+    "color": [
+      150,
+      120,
+      90
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "object",
+    "catid": 3,
+    "name": "pole",
+    "ignoreInEval": false,
+    "id": 17,
+    "color": [
+      153,
+      153,
+      153
+    ],
+    "trainId": 5
+  },
+  {
+    "hasInstances": false,
+    "category": "object",
+    "catid": 3,
+    "name": "polegroup",
+    "ignoreInEval": true,
+    "id": 18,
+    "color": [
+      153,
+      153,
+      153
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": false,
+    "category": "object",
+    "catid": 3,
+    "name": "traffic light",
+    "ignoreInEval": false,
+    "id": 19,
+    "color": [
+      250,
+      170,
+      30
+    ],
+    "trainId": 6
+  },
+  {
+    "hasInstances": false,
+    "category": "object",
+    "catid": 3,
+    "name": "traffic sign",
+    "ignoreInEval": false,
+    "id": 20,
+    "color": [
+      220,
+      220,
+      0
+    ],
+    "trainId": 7
+  },
+  {
+    "hasInstances": false,
+    "category": "nature",
+    "catid": 4,
+    "name": "vegetation",
+    "ignoreInEval": false,
+    "id": 21,
+    "color": [
+      107,
+      142,
+      35
+    ],
+    "trainId": 8
+  },
+  {
+    "hasInstances": false,
+    "category": "nature",
+    "catid": 4,
+    "name": "terrain",
+    "ignoreInEval": false,
+    "id": 22,
+    "color": [
+      152,
+      251,
+      152
+    ],
+    "trainId": 9
+  },
+  {
+    "hasInstances": false,
+    "category": "sky",
+    "catid": 5,
+    "name": "sky",
+    "ignoreInEval": false,
+    "id": 23,
+    "color": [
+      70,
+      130,
+      180
+    ],
+    "trainId": 10
+  },
+  {
+    "hasInstances": true,
+    "category": "human",
+    "catid": 6,
+    "name": "person",
+    "ignoreInEval": false,
+    "id": 24,
+    "color": [
+      220,
+      20,
+      60
+    ],
+    "trainId": 11
+  },
+  {
+    "hasInstances": true,
+    "category": "human",
+    "catid": 6,
+    "name": "rider",
+    "ignoreInEval": false,
+    "id": 25,
+    "color": [
+      255,
+      0,
+      0
+    ],
+    "trainId": 12
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "car",
+    "ignoreInEval": false,
+    "id": 26,
+    "color": [
+      0,
+      0,
+      142
+    ],
+    "trainId": 13
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "truck",
+    "ignoreInEval": false,
+    "id": 27,
+    "color": [
+      0,
+      0,
+      70
+    ],
+    "trainId": 14
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "bus",
+    "ignoreInEval": false,
+    "id": 28,
+    "color": [
+      0,
+      60,
+      100
+    ],
+    "trainId": 15
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "caravan",
+    "ignoreInEval": true,
+    "id": 29,
+    "color": [
+      0,
+      0,
+      90
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "trailer",
+    "ignoreInEval": true,
+    "id": 30,
+    "color": [
+      0,
+      0,
+      110
+    ],
+    "trainId": 255
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "train",
+    "ignoreInEval": false,
+    "id": 31,
+    "color": [
+      0,
+      80,
+      100
+    ],
+    "trainId": 16
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "motorcycle",
+    "ignoreInEval": false,
+    "id": 32,
+    "color": [
+      0,
+      0,
+      230
+    ],
+    "trainId": 17
+  },
+  {
+    "hasInstances": true,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "bicycle",
+    "ignoreInEval": false,
+    "id": 33,
+    "color": [
+      119,
+      11,
+      32
+    ],
+    "trainId": 18
+  },
+  {
+    "hasInstances": false,
+    "category": "vehicle",
+    "catid": 7,
+    "name": "license plate",
+    "ignoreInEval": true,
+    "id": -1,
+    "color": [
+      0,
+      0,
+      142
+    ],
+    "trainId": -1
+  }
+]
