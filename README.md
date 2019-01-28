@@ -30,3 +30,7 @@ Since the paper does not mention the training iters, I simply used a 9k schema. 
 I have tried various ways to use these two modules, include using `GP` as some attention vector to be multiplied to the feature (instead of directly addition) and adding `ARM` to the resnet residual path rather than to the residual block output as does with [SENET](https://arxiv.org/abs/1709.01507). These methods all failed, so I did not involve them in this repository.
 
 In a word, I am stuck, and I cannot make further improvement with `ARM` or `GP`. Please spare some light on me, if you have better understanding of the usage of these two modules.
+
+
+### More notes: 
+I don't quite understand the idea behind the structure of using spatial path actually. If features with stride=8 is needed, it can simply be done by using the 8x feature in the backbones, as does with [deeplabv3+]() which uses a 4x feature from the resnet backbone. In this way, BiSeNet shall also use features from the 8x stage, which I believe will take better advantage of the backbone features. If resnet 8x feature is better than 3 naive conv-bn-relu blocks, we should use resnet 8x feature, thus the model will become a resnet18 based [UNet]() with some attention blocks (and the effect of ARM cannot be verified in this repository). I will give up further trying in the short future and read more other paper, in hope for better understanding this model.  

@@ -358,9 +358,13 @@ arm合到bottleneck里面，改成se的结构conv-relu-con-sig
 让avg变成atten，加到feat32上去: 
 68.73
 
-===
-arm和avg都不要:
-69.06
+把iter数减小到40k试试: 
+arm和avg都不要: 66.95
+加上resnet之外的arm: 67.01
 
+iter减小到70k
+加上resnet之外的arm: 68.64
 
+使用修改后的scale的aug
+去掉warmup，去掉scale，使用标准xception
 

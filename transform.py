@@ -48,7 +48,7 @@ class HorizontalFlip(object):
 
 class RandomScale(object):
     def __init__(self, scales=(1, ), *args, **kwargs):
-        self.scales = scales
+        self.scales = [el**0.5 for el in scales]
 
     def __call__(self, im_lb):
         im = im_lb['im']

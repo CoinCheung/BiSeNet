@@ -157,7 +157,8 @@ class SpatialPath(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                nn.init.constant_(ly.bias, 0)
+                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+
 
 
 
