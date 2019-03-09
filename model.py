@@ -109,29 +109,18 @@ class ContextPath(nn.Module):
         H16, W16 = feat16.size()[2:]
         H32, W32 = feat32.size()[2:]
 
-        bilinear = False
-
         avg = F.avg_pool2d(feat32, feat32.size()[2:])
         avg = self.conv_avg(avg)
-        if bilinear:
-            avg_up = F.interpolate(avg, (H32, W32), mode='bilinear', align_corners=True)
-        else:
-            avg_up = F.interpolate(avg, (H32, W32), mode='nearest')
+        avg_up = F.interpolate(avg, (H32, W32), mode='nearest')
 
         feat32_arm = self.arm32(feat32)
         feat32_sum = feat32_arm + avg_up
-        if bilinear:
-            feat32_up = F.interpolate(feat32_sum, (H16, W16), mode='bilinear', align_corners=True)
-        else:
-            feat32_up = F.interpolate(feat32_sum, (H16, W16), mode='nearest')
+        feat32_up = F.interpolate(feat32_sum, (H16, W16), mode='nearest')
         feat32_up = self.conv_head32(feat32_up)
 
         feat16_arm = self.arm16(feat16)
         feat16_sum = feat16_arm + feat32_up
-        if bilinear:
-            feat16_up = F.interpolate(feat16_sum, (H8, W8), mode='bilinear', align_corners=True)
-        else:
-            feat16_up = F.interpolate(feat16_sum, (H8, W8), mode='nearest')
+        feat16_up = F.interpolate(feat16_sum, (H8, W8), mode='nearest')
         feat16_up = self.conv_head16(feat16_up)
 
         return feat16_up, feat32_up # x8, x16
