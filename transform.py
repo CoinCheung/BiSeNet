@@ -3,6 +3,7 @@
 
 
 from PIL import Image
+import PIL.ImageEnhance as ImageEnhance
 import random
 
 
@@ -17,7 +18,7 @@ class RandomCrop(object):
         W, H = self.size
         w, h = im.size
 
-        if (W, H) == (w, h): return dict(im = im, lb = lb)
+        if (W, H) == (w, h): return dict(im=im, lb=lb)
         if w < W or h < H:
             scale = float(W) / w if w < h else float(H) / h
             w, h = int(scale * w + 1), int(scale * h + 1)
@@ -48,7 +49,7 @@ class HorizontalFlip(object):
 
 class RandomScale(object):
     def __init__(self, scales=(1, ), *args, **kwargs):
-        self.scales = [el**0.5 for el in scales]
+        self.scales = scales
 
     def __call__(self, im_lb):
         im = im_lb['im']
@@ -61,17 +62,39 @@ class RandomScale(object):
                 )
 
 
-class ScaleBySize(object):
-    def __init__(self, size=(1536, 768), *args, **kwargs):
-        self.size = size
+class ColorJitter(object):
+    def __init__(self, brightness=None, contrast=None, saturation=None, *args, **kwargs):
+        if not brightness is None and brightness>0:
+            self.brightness = [max(1-brightness, 0), 1+brightness]
+        if not contrast is None and contrast>0:
+            self.contrast = [max(1-contrast, 0), 1+contrast]
+        if not saturation is None and saturation>0:
+            self.saturation = [max(1-saturation, 0), 1+saturation]
 
     def __call__(self, im_lb):
         im = im_lb['im']
         lb = im_lb['lb']
-        W, H = self.size
-        return dict(im = im.resize((W, H), Image.BILINEAR),
-                    lb = lb.resize((W, H), Image.NEAREST),
+        r_brightness = random.uniform(self.brightness[0], self.brightness[1])
+        r_contrast = random.uniform(self.contrast[0], self.contrast[1])
+        r_saturation = random.uniform(self.saturation[0], self.saturation[1])
+        im = ImageEnhance.Brightness(im).enhance(r_brightness)
+        im = ImageEnhance.Contrast(im).enhance(r_contrast)
+        im = ImageEnhance.Color(im).enhance(r_saturation)
+        return dict(im = im,
+                    lb = lb,
                 )
+
+
+class MultiScale(object):
+    def __init__(self, scales):
+        self.scales = scales
+
+    def __call__(self, img):
+        W, H = img.size
+        sizes = [(int(W*ratio), int(H*ratio)) for ratio in self.scales]
+        imgs = []
+        [imgs.append(img.resize(size, Image.BILINEAR)) for size in sizes]
+        return imgs
 
 
 class Compose(object):
@@ -82,6 +105,7 @@ class Compose(object):
         for comp in self.do_list:
             im_lb = comp(im_lb)
         return im_lb
+
 
 
 

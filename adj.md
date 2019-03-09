@@ -366,5 +366,116 @@ iter减小到70k
 加上resnet之外的arm: 68.64
 
 使用修改后的scale的aug
+
+avg先1x1conv之后，再bn再加到feat32上，不考虑sigmoid，如果不是相乘的话。
+
+arm改成conv-bn-relu，不使用conv-bn-sig
+
 去掉warmup，去掉scale，使用标准xception
+
+
+
+使用TrochSeg的结构: 
+nearest:  
+bilinear:  62.21，比不带inplace和dist的小0.3个点，可能是inplace的moment这一些的问题
+
+学习率改成2.5e-2: 
+61.30
+
+加上hard-mining: 
+bilinear, thresh=0.7, n_min=n_pixs/world_size/16
+
+lr=1e-2, bilinear + hard mining:
+cropsize=1536x768: 73.05 <-- 到这里了
+cropsize=2048x1024: 73.10
+flip+msc: 75.32
+
+试一下crop eval. scale单是1x1的，没有放大scale,单是对原图crop eval
+
+hard-mining, nearest, 不tune pretrained的bn, wd=5e-4:  
+flip+msc:
+74.87
+no flip+msc: 73.51
+
+学习率按照卡数减小试试。 
+76.07 - 说明之前是lr太大了. 
+
+新加的layer用10倍的lr
+75.13
+
+使用bilinear不用nearest: 
+74.66
+
+重新弄lrx10的，把optimizer里面也改改，
+81k:
+    lr0=1e-2
+        nearest: 75.86
+        bilinear: 
+    lr0=5e-3
+        nearest: 
+        bilinear: 
+80epoch: 
+    lr0=1e-2
+        nearest: 74.23
+        bilinear: 73.46
+    lr0=5e-3
+        nearest: 73.91
+        bilinear: 73.42
+还得用80k，原实现也是80epoch x 1000iter_per_epoch的
+
+看一下torchseg里面的epoch怎么算的，看一下msc是否应该是logits相加，看一下flip是水平flip还是竖直flip:
+这个原实现用的是先把flip的logits相加，再做torch.exp，把各个scale的exp再相加，而且使用的是crop 1024的方法做的。 
+
+不加msc+flip应该是76.2才对.  
+
+1e-2, nearest不加warmup试试: 71.97
+
+
+
+1e-2, 80k, 1warmup
+ffm 和 BiseNetOutput使用10倍lr，其他都是1倍的lr, 所有的bn和bias都不加wd，bilinear
+bilinear: 75.65
+    flip加exp: 75.80
+    crop evaluation: empty: 77.42(stride=2/3), 77.42(stride=5/6), zeros: 77.42
+nearest: 75.38
+
+bilinear: 2e-2
+76.35
+bilinear: 5e-3
+77.16
+
+加上warmup的, bilinear, lr=1e-2, 80k: 
+cropsize = 1024
+78.24
+cropsize = 960，跟训练时一样大:
+78.16
+说明eval的时候还是大一点的crop size比较好，跟训练不一致也没关系，只要别大的离谱。 
+
+lr=1e-2, wd=5e-4, 80k, warmup=1000, hard-mining, color_jitter, crop=960:
+78.90
+
+尝试新的更省内存的ohem，与上面结果是否一致: 
+78.29 - 好像又坏了。 
+
+新ohem, 用回1024做train试试: 
+78.23 - 好像没有改变
+
+再试旧的ohem+960: 
+78.13
+
+试试deeplab的ohem，960不够大了，算了
+
+final: crop=1024, 新的ohem
+
+使用nearest试试: 
+78.63
+
+
+refactoring: 
+
+
+
+试试focal loss: 
+
+使用res2代替sp: 
 

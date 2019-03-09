@@ -104,8 +104,10 @@ venv.bak/
 
 
 ## Coin: 
+data
 data/
 play.py
 preprocess_data.py
 res/
+adj.md
 

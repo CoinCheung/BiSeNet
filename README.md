@@ -34,3 +34,16 @@ In a word, I am stuck, and I cannot make further improvement with `ARM` or `GP`.
 
 ### More notes: 
 I don't quite understand the idea behind the structure of using spatial path actually. If features with stride=8 is needed, it can simply be done by using the 8x feature in the backbones, as does with [deeplabv3+]() which uses a 4x feature from the resnet backbone. In this way, BiSeNet shall also use features from the 8x stage, which I believe will take better advantage of the backbone features. If resnet 8x feature is better than 3 naive conv-bn-relu blocks, we should use resnet 8x feature, thus the model will become a resnet18 based [UNet]() with some attention blocks (and the effect of ARM cannot be verified in this repository). I will give up further trying in the short future and read more other paper, in hope for better understanding this model.  
+
+
+### Tricks:
+1. use online hard example ming, and only train the hard pixels, partly solve the problem of pixel number not balanced
+2. do not tune bn and bias parameters
+3. use 10 times the lr at the output layers
+4. use crop evaluation, which means that we need to crop chips with the same size as the training crop size. We could crop overlapped chips from one image and infer with the cropped chips, then add the scores of the chips to the associated positions in the whole score map.
+5. multi-scale-flip training/evaluating
+6. warmup
+
+
+### Things should take care
+1. the fliped-msc evaluation means add the logits of the original prediction and its flipped version first, and then compute the exponential of the sum. The final prediciton is computed via adding all the scores of all the scales together.

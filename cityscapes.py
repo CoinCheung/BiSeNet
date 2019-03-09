@@ -66,12 +66,13 @@ class CityScapes(Dataset):
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
             ])
         self.trans_train = Compose([
+            ColorJitter(
+                brightness = 0.5,
+                contrast = 0.5,
+                saturation = 0.5),
             HorizontalFlip(),
-            RandomScale((0.75, 1.0, 1.5, 1.75, 2.0)),
+            RandomScale((0.75, 1.0, 1.25, 1.5, 1.75, 2.0)),
             RandomCrop(cropsize)
-            ])
-        self.trans_val = Compose([
-            ScaleBySize((1536, 768)),
             ])
 
 
@@ -84,10 +85,6 @@ class CityScapes(Dataset):
         if self.mode == 'train':
             im_lb = dict(im = img, lb = label)
             im_lb = self.trans_train(im_lb)
-            img, label = im_lb['im'], im_lb['lb']
-        else:
-            im_lb = dict(im = img, lb = label)
-            #  im_lb = self.trans_val(im_lb)
             img, label = im_lb['im'], im_lb['lb']
         img = self.to_tensor(img)
         label = np.array(label).astype(np.int64)[np.newaxis, :]
@@ -109,9 +106,6 @@ class CityScapes(Dataset):
 if __name__ == "__main__":
     from tqdm import tqdm
     ds = CityScapes('./data/', n_classes=19, mode='val')
-    #  ds = CityScapes('./data/', n_classes=19, mode='train')
-    #  im, label = ds[10]
-    #  _ = input()
     uni = []
     for im, lb in tqdm(ds):
         lb_uni = np.unique(lb).tolist()
@@ -119,35 +113,3 @@ if __name__ == "__main__":
     print(uni)
     print(set(uni))
 
-    #  #  print(type(im))
-    #  #  print(im.size())
-    #  #  print(label.size())
-    #  #  print(type(label))
-    #  from torch.utils.data import DataLoader
-    #  dl = DataLoader(ds,
-    #                  batch_size = 30,
-    #                  shuffle = False,
-    #                  num_workers = 6,
-    #                  drop_last = False)
-    #  im, lb = next(iter(dl))
-    #  lb = lb.numpy()
-    #  #  print(lb)
-    #  print(type(lb))
-    #  print(lb.shape)
-    #  print(label.shape)
-    #  #  print(im)
-    #  print(im.size())
-    #  print(np.max(lb))
-    #
-    #  from tqdm import tqdm
-    #
-    #  diter = iter(dl)
-    #  lmax, lmin = -1, 1000
-    #  for i, (im, lb) in enumerate(tqdm(diter)):
-    #      lb = lb.numpy()
-    #      lb[lb == 255] = 3
-    #      lmax = np.max(lb) if lmax < np.max(lb) else lmax
-    #      lmin = np.min(lb) if lmin > np.min(lb) else lmin
-    #
-    #  print(lmax, lmin)
-    #
