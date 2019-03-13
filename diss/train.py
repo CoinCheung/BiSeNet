@@ -3,7 +3,7 @@
 
 
 from logger import setup_logger
-from model import BiSeNet
+from diss.model import BiSeNet
 from cityscapes import CityScapes
 from loss import OhemCELoss
 from evaluate import evaluate
@@ -44,7 +44,7 @@ def train():
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(
                 backend = 'nccl',
-                init_method = 'tcp://127.0.0.1:33271',
+                init_method = 'tcp://127.0.0.1:33241',
                 world_size = torch.cuda.device_count(),
                 rank=args.local_rank
                 )
@@ -76,9 +76,9 @@ def train():
             )
     score_thres = 0.7
     n_min = n_img_per_gpu*cropsize[0]*cropsize[1]//16
-    criteria_p = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
-    criteria_16 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
-    criteria_32 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
+    LossP = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
+    Loss2 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
+    Loss3 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
 
     ## optimizer
     momentum = 0.9
@@ -120,9 +120,9 @@ def train():
 
         optim.zero_grad()
         out, out16, out32 = net(im)
-        lossp = criteria_p(out, lb)
-        loss2 = criteria_16(out16, lb)
-        loss3 = criteria_32(out32, lb)
+        lossp = LossP(out, lb)
+        loss2 = Loss2(out16, lb)
+        loss3 = Loss3(out32, lb)
         loss = lossp + loss2 + loss3
         loss.backward()
         optim.step()

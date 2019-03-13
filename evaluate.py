@@ -147,7 +147,8 @@ def evaluate(respth='./res', dspth='./data'):
     logger = logging.getLogger()
 
     ## model
-    logger.info('\n===='*20)
+    logger.info('\n')
+    logger.info('===='*20)
     logger.info('evaluating the model ...\n')
     logger.info('setup and restore model')
     n_classes = 19
