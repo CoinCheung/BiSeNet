@@ -6,7 +6,7 @@ from logger import setup_logger
 from diss.model import BiSeNet
 from cityscapes import CityScapes
 from loss import OhemCELoss
-from evaluate import evaluate
+from diss.evaluate import evaluate
 from optimizer import Optimizer
 
 import torch
@@ -155,7 +155,7 @@ def train():
             st = ed
 
     ## dump the final model
-    save_pth = osp.join(respth, 'model_final.pth')
+    save_pth = osp.join(respth, 'model_final_diss.pth')
     net.cpu()
     state = net.module.state_dict() if hasattr(net, 'module') else net.state_dict()
     if dist.get_rank()==0: torch.save(state, save_pth)

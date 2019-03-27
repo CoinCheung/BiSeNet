@@ -22,32 +22,29 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(in_chan, out_chan, stride)
         self.bn1 = BatchNorm2d(out_chan)
-        self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(out_chan, out_chan)
-        self.bn2 = nn.BatchNorm2d(out_chan)
+        self.bn2 = BatchNorm2d(out_chan, activation='none')
+        self.relu = nn.ReLU(inplace=True)
         self.downsample = None
         if in_chan != out_chan or stride != 1:
             self.downsample = nn.Sequential(
                 nn.Conv2d(in_chan, out_chan,
                           kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_chan),
+                BatchNorm2d(out_chan, activation='none'),
                 )
 
     def forward(self, x):
-        residual = x
+        residual = self.conv1(x)
+        residual = self.bn1(residual)
+        residual = self.conv2(residual)
+        residual = self.bn2(residual)
 
-        out = self.conv1(x)
-        out = self.bn1(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-
+        shortcut = x
         if self.downsample is not None:
-            residual = self.downsample(x)
+            shortcut = self.downsample(x)
 
-        out += residual
+        out = shortcut + residual
         out = self.relu(out)
-
         return out
 
 
@@ -55,14 +52,6 @@ def create_layer_basic(in_chan, out_chan, bnum, stride=1):
     layers = [BasicBlock(in_chan, out_chan, stride=stride)]
     for i in range(bnum-1):
         layers.append(BasicBlock(out_chan, out_chan, stride=1))
-    return nn.Sequential(*layers)
-
-
-def create_layer_basic_arm(in_chan, out_chan, bnum, stride=1):
-    layers = [BasicBlock(in_chan, out_chan, stride=stride)]
-    for i in range(bnum-2):
-        layers.append(BasicBlock(out_chan, out_chan, stride=1))
-    layers.append(BasicBlockArm(out_chan, out_chan, stride=1))
     return nn.Sequential(*layers)
 
 
@@ -99,13 +88,15 @@ class Resnet18(nn.Module):
         self.load_state_dict(self_state_dict)
 
     def get_params(self):
-        bn_params, non_bn_params = [], []
-        for name, param in self.named_parameters():
-            if 'bn' in name or 'downsample.1' in name:
-                bn_params.append(param)
-            else:
-                non_bn_params.append(param)
-        return bn_params, non_bn_params
+        wd_params, nowd_params = [], []
+        for name, module in self.named_modules():
+            if isinstance(module, (nn.Linear, nn.Conv2d)):
+                wd_params.append(module.weight)
+                if not module.bias is None:
+                    nowd_params.append(module.bias)
+            elif isinstance(module, (BatchNorm2d, nn.BatchNorm2d)):
+                nowd_params += list(module.parameters())
+        return wd_params, nowd_params
 
 
 if __name__ == "__main__":
