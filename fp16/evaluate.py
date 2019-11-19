@@ -2,7 +2,7 @@
 # -*- encoding: utf-8 -*-
 
 from logger import setup_logger
-from diss.model import BiSeNet
+from fp16.model import BiSeNet
 from cityscapes import CityScapes
 
 import torch
@@ -153,7 +153,7 @@ def evaluate(respth='./res', dspth='./data'):
     logger.info('setup and restore model')
     n_classes = 19
     net = BiSeNet(n_classes=n_classes)
-    save_pth = osp.join(respth, 'model_final_diss.pth')
+    save_pth = osp.join(respth, 'model_final.pth')
     net.load_state_dict(torch.load(save_pth))
     net.cuda()
     net.eval()

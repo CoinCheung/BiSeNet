@@ -1,14 +1,13 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
 
-
 import sys
 sys.path.insert(0, '.')
 from logger import setup_logger
-from diss.model import BiSeNet
+from fp16.model import BiSeNet
 from cityscapes import CityScapes
 from loss import OhemCELoss
-from diss.evaluate import evaluate
+from fp16.evaluate import evaluate
 from optimizer import Optimizer
 
 import torch
@@ -16,6 +15,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import torch.distributed as dist
+from apex import amp
 
 import os
 import os.path as osp
@@ -46,7 +46,7 @@ def train():
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(
                 backend = 'nccl',
-                init_method = 'tcp://127.0.0.1:33241',
+                init_method = 'tcp://127.0.0.1:33271',
                 world_size = torch.cuda.device_count(),
                 rank=args.local_rank
                 )
@@ -72,15 +72,11 @@ def train():
     net = BiSeNet(n_classes=n_classes)
     net.cuda()
     net.train()
-    net = nn.parallel.DistributedDataParallel(net,
-            device_ids = [args.local_rank, ],
-            output_device = args.local_rank
-            )
     score_thres = 0.7
     n_min = n_img_per_gpu*cropsize[0]*cropsize[1]//16
-    LossP = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
-    Loss2 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
-    Loss3 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
+    criteria_p = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
+    criteria_16 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
+    criteria_32 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
 
     ## optimizer
     momentum = 0.9
@@ -91,7 +87,8 @@ def train():
     warmup_steps = 1000
     warmup_start_lr = 1e-5
     optim = Optimizer(
-            model = net.module,
+            #  model = net.module,
+            model = net,
             lr0 = lr_start,
             momentum = momentum,
             wd = weight_decay,
@@ -99,6 +96,16 @@ def train():
             warmup_start_lr = warmup_start_lr,
             max_iter = max_iter,
             power = power)
+
+    ## fp16
+    net, opt = amp.initialize(net, optim.optim, opt_level='O1')
+    optim.optim = opt
+
+    ## set dist
+    net = nn.parallel.DistributedDataParallel(net,
+            device_ids = [args.local_rank, ],
+            output_device = args.local_rank
+            )
 
     ## train loop
     msg_iter = 50
@@ -122,11 +129,13 @@ def train():
 
         optim.zero_grad()
         out, out16, out32 = net(im)
-        lossp = LossP(out, lb)
-        loss2 = Loss2(out16, lb)
-        loss3 = Loss3(out32, lb)
+        lossp = criteria_p(out, lb)
+        loss2 = criteria_16(out16, lb)
+        loss3 = criteria_32(out32, lb)
         loss = lossp + loss2 + loss3
-        loss.backward()
+        #  loss.backward()
+        with amp.scale_loss(loss, opt) as scaled_loss:
+            scaled_loss.backward()
         optim.step()
 
         loss_avg.append(loss.item())
@@ -157,7 +166,7 @@ def train():
             st = ed
 
     ## dump the final model
-    save_pth = osp.join(respth, 'model_final_diss.pth')
+    save_pth = osp.join(respth, 'model_final.pth')
     net.cpu()
     state = net.module.state_dict() if hasattr(net, 'module') else net.state_dict()
     if dist.get_rank()==0: torch.save(state, save_pth)

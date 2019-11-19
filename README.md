@@ -43,6 +43,16 @@ Note:
 Since I used randomly generated seed for the random operations, the results may fluctuate within the range of [78.17, 78.72], depending on the specific random status during training. I am lucky to have captured a result of 78.4+ mIOU. If you want to train your own model from scratch, please make sure that you are lucky too.
 
 
+### fp16
+If your gpu supports fp16 mode, and you would like to train with in the mixed precision mode, you can do like this:  
+```
+    $ CUDA_VISIBLE_DEVICES=0,1 python -m torch.distributed.launch --nproc_per_node=2 fp16/train.py
+```
+Note that, I tested this training in fp16 mode with `pytorch1.3` and `apex` of commit `95d6c007ec9cca4231`. This environment configuration may not be same with training other models(I did not tested training the other model in this environment).
+
+Also, in this fp16 model, I used the `sync-bn` officially provided by pytorch, rather than the `inplace-abn`. 
+
+
 
 ### Tricks:  
 These are the tricks that I find might be useful:  
