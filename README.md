@@ -53,6 +53,13 @@ Note that, I tested this training in fp16 mode with `pytorch1.3` and `apex` of c
 Also, in this fp16 model, I used the `sync-bn` officially provided by pytorch, rather than the `inplace-abn`. 
 
 
+### Demo
+You can run inference on a single model like this:
+```python
+    python demo.py --ckpt res/model_final.pth --img_path ./pic.jpg
+```
+
+
 
 ### Tricks:  
 These are the tricks that I find might be useful:  
