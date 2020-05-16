@@ -80,7 +80,7 @@ class CityScapes(Dataset):
         fn  = self.imnames[idx]
         impth = self.imgs[fn]
         lbpth = self.labels[fn]
-        img = Image.open(impth)
+        img = Image.open(impth).convert('RGB')
         label = Image.open(lbpth)
         if self.mode == 'train':
             im_lb = dict(im = img, lb = label)

@@ -35,7 +35,7 @@ to_tensor = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
-im = to_tensor(Image.open(args.img_path)).unsqueeze(0).cuda()
+im = to_tensor(Image.open(args.img_path).convert('RGB')).unsqueeze(0).cuda()
 
 # inference
 out = net(im)[0].argmax(dim=1).squeeze().detach().cpu().numpy()
