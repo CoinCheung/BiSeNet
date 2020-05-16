@@ -9,9 +9,7 @@ import torchvision
 
 from .resnet import Resnet18
 
-#  from torch.nn import BatchNorm2d
-def BatchNorm2d(out_chan):
-    return nn.SyncBatchNorm.convert_sync_batchnorm(nn.BatchNorm2d(out_chan))
+from torch.nn import BatchNorm2d
 
 
 class ConvBNReLU(nn.Module):

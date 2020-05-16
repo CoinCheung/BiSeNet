@@ -70,6 +70,7 @@ def train():
     ## model
     ignore_idx = 255
     net = BiSeNet(n_classes=n_classes)
+    net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
     net.cuda()
     net.train()
     score_thres = 0.7
