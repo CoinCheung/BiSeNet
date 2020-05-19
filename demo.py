@@ -6,8 +6,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 import cv2
 import datetime
-from model_061_new import DABLNet
-import statistics as stat
+from fp16.model import BiSeNet
 from visualize import get_color_pallete
 import os
 parse = argparse.ArgumentParser()
@@ -25,7 +24,7 @@ args = parse.parse_args()
 
 
 # define model
-net = DABLNet(n_classes=19)
+net = BiSeNet(n_classes=19)
 net.load_state_dict(torch.load(args.ckpt, map_location='cpu'))
 net.eval()
 net.cuda()
