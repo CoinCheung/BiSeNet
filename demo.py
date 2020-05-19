@@ -7,6 +7,7 @@ from PIL import Image
 import cv2
 import datetime
 from fp16.model import BiSeNet
+import statistics as stat
 from visualize import get_color_pallete
 import os
 parse = argparse.ArgumentParser()
