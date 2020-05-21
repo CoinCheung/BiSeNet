@@ -1,3 +1,15 @@
+# BiSeNetV2 is coming
+
+BiSeNetV2 is faster and requires less memory, you can try BiSeNetV2 on cityscapes like this:  
+```
+    $ export CUDA_VISIBLE_DEVICES=0,1
+    $ python -m torch.distributed.launch --nproc_per_node=2 bisenetv2/train.py --fp16
+```
+This would train the model and then compute the mIOU on eval set.   
+
+I barely achieve mIOU of around 71. Though I can boost the performace by adding more regularizations and pretraining, as this would be beyond the scope of the paper, let's wait for the official implementation and see how they achieved that mIOU of 73.
+
+
 # BiSeNet
 My implementation of [BiSeNet](https://arxiv.org/abs/1808.00897). My environment is pytorch1.0 and python3, the code is not tested with other environments, but it should also work on similar environments.
 
