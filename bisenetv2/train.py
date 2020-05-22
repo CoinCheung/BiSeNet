@@ -41,9 +41,9 @@ torch.backends.cudnn.deterministic = True
 #  torch.backends.cudnn.benchmark = True
 #  torch.multiprocessing.set_sharing_strategy('file_system')
 
-lr_start = 5e-2
+lr_start = 2.5e-2
 warmup_iters = 1000
-max_iter = 150000 + warmup_iters
+max_iter = 300000 + warmup_iters
 ims_per_gpu = 8
 
 
@@ -52,7 +52,7 @@ def parse_args():
     parse.add_argument('--local_rank', dest='local_rank', type=int, default=-1,)
     parse.add_argument('--sync-bn', dest='use_sync_bn', action='store_true',)
     parse.add_argument('--fp16', dest='use_fp16', action='store_true',)
-    parse.add_argument('--port', dest='port', type=int, default=44553,)
+    parse.add_argument('--port', dest='port', type=int, default=44554,)
     parse.add_argument('--respth', dest='respth', type=str, default='./res',)
     return parse.parse_args()
 

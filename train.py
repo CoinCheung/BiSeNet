@@ -36,6 +36,12 @@ def parse_args():
             type = int,
             default = -1,
             )
+    parse.add_argument(
+            '--ckpt',
+            dest = 'ckpt',
+            type = str,
+            default = None,
+            )
     return parse.parse_args()
 
 
@@ -68,6 +74,8 @@ def train():
     ## model
     ignore_idx = 255
     net = BiSeNet(n_classes=n_classes)
+    if not args.ckpt is None:
+        net.load_state_dict(torch.load(args.ckpt, map_location='cpu'))
     net.cuda()
     net.train()
     net = nn.parallel.DistributedDataParallel(net,
