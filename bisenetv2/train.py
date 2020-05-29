@@ -41,9 +41,9 @@ torch.backends.cudnn.deterministic = True
 #  torch.backends.cudnn.benchmark = True
 #  torch.multiprocessing.set_sharing_strategy('file_system')
 
-lr_start = 2.5e-2
+lr_start = 5e-2
 warmup_iters = 1000
-max_iter = 300000 + warmup_iters
+max_iter = 150000  + warmup_iters
 ims_per_gpu = 8
 
 

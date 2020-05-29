@@ -129,11 +129,11 @@ class TransformationTrain(object):
         self.trans_func = T.Compose([
             T.RandomResizedCrop([0.375, 1.], [512, 1024]),
             T.RandomHorizontalFlip(),
-            #  T.ColorJitter(
-            #      brightness=0.4,
-            #      contrast=0.4,
-            #      saturation=0.4
-            #  ),
+            T.ColorJitter(
+                brightness=0.4,
+                contrast=0.4,
+                saturation=0.4
+            ),
         ])
 
     def __call__(self, im_lb):

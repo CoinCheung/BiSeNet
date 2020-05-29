@@ -100,6 +100,7 @@ class GELayerS1(nn.Module):
                 in_chan, mid_chan, kernel_size=3, stride=1,
                 padding=1, groups=in_chan, bias=False),
             nn.BatchNorm2d(mid_chan),
+            nn.ReLU(inplace=True), # not shown in paper
         )
         self.conv2 = nn.Sequential(
             nn.Conv2d(
@@ -136,6 +137,7 @@ class GELayerS2(nn.Module):
                 mid_chan, mid_chan, kernel_size=3, stride=1,
                 padding=1, groups=mid_chan, bias=False),
             nn.BatchNorm2d(mid_chan),
+            nn.ReLU(inplace=True), # not shown in paper
         )
         self.conv2 = nn.Sequential(
             nn.Conv2d(
@@ -238,6 +240,7 @@ class BGALayer(nn.Module):
                 128, 128, kernel_size=3, stride=1,
                 padding=1, bias=False),
             nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True), # not shown in paper
         )
 
     def forward(self, x_d, x_s):
@@ -286,11 +289,11 @@ class BiSeNetV2(nn.Module):
         self.bga = BGALayer()
 
         ## TODO: what is the number of mid chan ?
-        self.head = SegmentHead(128, 256, n_classes)
-        self.aux2 = SegmentHead(16, 32, n_classes)
-        self.aux3 = SegmentHead(32, 64, n_classes)
+        self.head = SegmentHead(128, 1024, n_classes)
+        self.aux2 = SegmentHead(16, 128, n_classes)
+        self.aux3 = SegmentHead(32, 128, n_classes)
         self.aux4 = SegmentHead(64, 128, n_classes)
-        self.aux5_4 = SegmentHead(128, 256, n_classes)
+        self.aux5_4 = SegmentHead(128, 128, n_classes)
 
         self.init_weights()
 
