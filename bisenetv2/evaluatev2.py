@@ -91,7 +91,7 @@ def evaluate(weight_pth):
         )
 
     ## evaluator
-    eval_model(net, 4)
+    eval_model(net, 2)
 
 
 def parse_args():

@@ -61,6 +61,7 @@ def train():
     n_img_per_gpu = 8
     n_workers = 4
     cropsize = [1024, 1024]
+    #  cropsize = [1024, 512]
     ds = CityScapes('./data', cropsize=cropsize, mode='train')
     sampler = torch.utils.data.distributed.DistributedSampler(ds)
     dl = DataLoader(ds,

@@ -5,9 +5,25 @@ BiSeNetV2 is faster and requires less memory, you can try BiSeNetV2 on cityscape
     $ export CUDA_VISIBLE_DEVICES=0,1
     $ python -m torch.distributed.launch --nproc_per_node=2 bisenetv2/train.py --fp16
 ```
-This would train the model and then compute the mIOU on eval set.   
+This would train the model and then compute the mIOU on eval set. 
 
-I barely achieve mIOU of around 71. Though I can boost the performace by adding more regularizations and pretraining, as this would be beyond the scope of the paper, let's wait for the official implementation and see how they achieved that mIOU of 73.
+~~I barely achieve mIOU of around 71. Though I can boost the performace by adding more regularizations and pretraining, as this would be beyond the scope of the paper, let's wait for the official implementation and see how they achieved that mIOU of 73.~~
+
+Here is the tips how I achieved 74.39 mIOU: 
+1. larger training scale range: In the paper, they say the images are first resized to range (0.75, 2), then 1024x2048 patches are cropped and resized to 512x1024, which equals to first resized to (0.375, 1) then crop with 512x1024 patches. In my implementation, I first rescale the image by range of (0.25, 2), and then directly crop 512x1024 patches to train.
+
+2. original inference scale: In the paper, they first rescale the image into 512x1024 to run inference, then rescale back to original size of 1024x2048. In my implementation, I directly use original size of 1024x2048 to inference.
+
+3. colorjitter as augmentations.
+
+Note that, like bisenetv1, bisenetv2 also has a relatively big variance. Here is the mIOU after training 5 times on my platform:
+
+| #No. | 1 | 2 | 3 | 4 | 5 | 
+|:---|:---|:---|:---|:---|:---|
+| mIOU | 74.28 | 72.96 | 73.73 | 74.39 | 73.77 |
+
+You can download the pretrained model with mIOU of 74.39 following this [link](https://drive.google.com/file/d/1r_F-KZg-3s2pPcHRIuHZhZ0DQ0wocudk/view?usp=sharing).
+
 
 
 # BiSeNet

@@ -127,7 +127,8 @@ class TransformationTrain(object):
 
     def __init__(self):
         self.trans_func = T.Compose([
-            T.RandomResizedCrop([0.375, 1.], [512, 1024]),
+            #  T.RandomResizedCrop([0.375, 1.], [512, 1024]),
+            T.RandomResizedCrop([0.25, 2], [512, 1024]),
             T.RandomHorizontalFlip(),
             T.ColorJitter(
                 brightness=0.4,
@@ -145,7 +146,7 @@ class TransformationVal(object):
 
     def __call__(self, im_lb):
         im, lb = im_lb['im'], im_lb['lb']
-        im = cv2.resize(im, (1024, 512))
+        #  im = cv2.resize(im, (1024, 512))
         return dict(im=im, lb=lb)
 
 
