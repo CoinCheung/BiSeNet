@@ -2,7 +2,7 @@
 # -*- encoding: utf-8 -*-
 
 import sys
-sys.path.insert(0, './lib')
+sys.path.insert(0, '.')
 import os
 import os.path as osp
 import random

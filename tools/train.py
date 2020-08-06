@@ -2,7 +2,7 @@
 # -*- encoding: utf-8 -*-
 
 import sys
-sys.path.insert(0, './lib')
+sys.path.insert(0, '.')
 import os
 import os.path as osp
 import random
@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from lib.models import model_factory
 from configs import cfg_factory
 from lib.cityscapes_cv2 import get_data_loader
-from evaluate import eval_model
+from tools.evaluate import eval_model
 from lib.ohem_ce_loss import OhemCELoss
 from lib.lr_scheduler import WarmupPolyLrScheduler
 from lib.meters import TimeMeter, AvgMeter

@@ -11,8 +11,8 @@ import torch.distributed as dist
 import cv2
 import numpy as np
 
-import transform_cv2 as T
-from sampler import RepeatedDistSampler
+import lib.transform_cv2 as T
+from lib.sampler import RepeatedDistSampler
 
 
 

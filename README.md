@@ -26,7 +26,7 @@ My platform is like this:
 ## get start
 With a pretrained weight, you can run inference on an single image like this: 
 ```
-$ python tools/demo.py --model bisenetv2 --weight-path /path/to/your/weights.pth --img-path ./example.jpg
+$ python tools/demo.py --model bisenetv2 --weight-path /path/to/your/weights.pth --img-path ./example.png
 ```
 This would run inference on the image and save the result image to `./res.jpg`.
 
