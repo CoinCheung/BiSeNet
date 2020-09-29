@@ -110,4 +110,5 @@ play.py
 preprocess_data.py
 res/
 adj.md
+tensorrt/build/*
 

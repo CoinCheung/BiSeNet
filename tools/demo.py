@@ -4,11 +4,11 @@ sys.path.insert(0, '.')
 import argparse
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
 from PIL import Image
 import numpy as np
 import cv2
 
+import lib.transform_cv2 as T
 from lib.models import model_factory
 from configs import cfg_factory
 
@@ -25,10 +25,7 @@ args = parse.parse_args()
 cfg = cfg_factory[args.model]
 
 
-# palette and mean/std
 palette = np.random.randint(0, 256, (256, 3), dtype=np.uint8)
-mean = torch.tensor([0.3257, 0.3690, 0.3223], dtype=torch.float32).view(-1, 1, 1)
-std = torch.tensor([0.2112, 0.2148, 0.2115], dtype=torch.float32).view(-1, 1, 1)
 
 # define model
 net = model_factory[cfg.model_type](19)
@@ -37,9 +34,12 @@ net.eval()
 net.cuda()
 
 # prepare data
-im = cv2.imread(args.img_path)
-im = im[:, :, ::-1].transpose(2, 0, 1).astype(np.float32)
-im = torch.from_numpy(im).div_(255).sub_(mean).div_(std).unsqueeze(0).cuda()
+to_tensor = T.ToTensor(
+    mean=(0.3257, 0.3690, 0.3223), # city, rgb
+    std=(0.2112, 0.2148, 0.2115),
+)
+im = cv2.imread(args.img_path)[:, :, ::-1]
+im = to_tensor(dict(im=im, lb=None))['im'].unsqueeze(0).cuda()
 
 # inference
 out = net(im)[0].argmax(dim=1).squeeze().detach().cpu().numpy()

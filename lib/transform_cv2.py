@@ -129,13 +129,14 @@ class ToTensor(object):
 
     def __call__(self, im_lb):
         im, lb = im_lb['im'], im_lb['lb']
-        im = im[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) # to rgb order
+        im = im.transpose(2, 0, 1).astype(np.float32)
         im = torch.from_numpy(im).div_(255)
         dtype, device = im.dtype, im.device
         mean = torch.as_tensor(self.mean, dtype=dtype, device=device)[:, None, None]
         std = torch.as_tensor(self.std, dtype=dtype, device=device)[:, None, None]
         im = im.sub_(mean).div_(std).clone()
-        lb = torch.from_numpy(lb.astype(np.int64).copy()).clone()
+        if not lb is None:
+            lb = torch.from_numpy(lb.astype(np.int64).copy()).clone()
         return dict(im=im, lb=lb)
 
 
@@ -153,87 +154,5 @@ class Compose(object):
 
 
 if __name__ == '__main__':
-    #  from PIL import Image
-    #  im = Image.open(imgpth)
-    #  lb = Image.open(lbpth)
-    #  print(lb.size)
-    #  im.show()
-    #  lb.show()
-    import cv2
-    im = cv2.imread(imgpth)
-    lb = cv2.imread(lbpth, 0)
-    lb = lb * 10
-
-    trans = Compose([
-        RandomHorizontalFlip(),
-        RandomShear(p=0.5, rate=3),
-        RandomRotate(p=0.5, degree=5),
-        RandomScale([0.5, 0.7]),
-        RandomCrop((768, 768)),
-        RandomErasing(p=1, size=(36, 36)),
-        ChannelShuffle(p=1),
-        ColorJitter(
-            brightness=0.3,
-            contrast=0.3,
-            saturation=0.5
-        ),
-        #  RandomEqualize(p=0.1),
-    ])
-    #  inten = dict(im=im, lb=lb)
-    #  out = trans(inten)
-    #  im = out['im']
-    #  lb = out['lb']
-    #  cv2.imshow('lb', lb)
-    #  cv2.imshow('org', im)
-    #  cv2.waitKey(0)
-
-
-    ### try merge rotate and shear here
-    im = cv2.imread(imgpth)
-    lb = cv2.imread(lbpth, 0)
-    im = cv2.resize(im, (1024, 512))
-    lb = cv2.resize(lb, (1024, 512), interpolation=cv2.INTER_NEAREST)
-    lb = lb * 10
-    inten = dict(im=im, lb=lb)
-    trans1 = Compose([
-        RandomShear(p=1, rate=0.15),
-        #  RandomRotate(p=1, degree=10),
-    ])
-    trans2 = Compose([
-        #  RandomShearRotate(p_shear=1, p_rot=0, rate_shear=0.1, rot_degree=9),
-        RandomHFlipShearRotate(p_flip=0.5, p_shear=1, p_rot=0, rate_shear=0.1, rot_degree=9),
-    ])
-    out1 = trans1(inten)
-    im1 = out1['im']
-    lb1 = out1['lb']
-    #  cv2.imshow('lb', lb1)
-    cv2.imshow('org1', im1)
-    out2 = trans2(inten)
-    im2 = out2['im']
-    lb2 = out2['lb']
-    #  cv2.imshow('lb', lb1)
-    #  cv2.imshow('org2', im2)
-    cv2.waitKey(0)
-    print(np.sum(im1-im2))
-    print('====')
-    ####
-
-
-    totensor = ToTensor(
-        mean=(0.406, 0.456, 0.485),
-        std=(0.225, 0.224, 0.229)
-    )
-    #  print(im[0, :2, :2])
-    print(lb[:2, :2])
-    out = totensor(out)
-    im = out['im']
-    lb = out['lb']
-    print(im.size())
-    #  print(im[0, :2, :2])
-    #  print(lb[:2, :2])
-
-    out = totensor(inten)
-    im = out['im']
-    print(im.size())
-    print(im[0, 502:504, 766:768])
+    pass
 

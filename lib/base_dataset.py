@@ -40,7 +40,7 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, idx):
         impth, lbpth = self.img_paths[idx], self.lb_paths[idx]
-        img, label = cv2.imread(impth), cv2.imread(lbpth, 0)
+        img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
         if not self.lb_map is None:
             label = self.lb_map[label]
         im_lb = dict(im=img, lb=label)

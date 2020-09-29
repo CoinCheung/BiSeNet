@@ -23,6 +23,24 @@ class ConvBNReLU(nn.Module):
         return feat
 
 
+class UpSample(nn.Module):
+
+    def __init__(self, n_chan, factor=2):
+        super(UpSample, self).__init__()
+        out_chan = n_chan * factor * factor
+        self.proj = nn.Conv2d(n_chan, out_chan, 1, 1, 0)
+        self.up = nn.PixelShuffle(factor)
+        self.init_weight()
+
+    def forward(self, x):
+        feat = self.proj(x)
+        feat = self.up(feat)
+        return feat
+
+    def init_weight(self):
+        nn.init.xavier_normal_(self.proj.weight, gain=1.)
+
+
 class DetailBranch(nn.Module):
 
     def __init__(self):
@@ -234,6 +252,8 @@ class BGALayer(nn.Module):
                 128, 128, kernel_size=1, stride=1,
                 padding=0, bias=False),
         )
+        self.up1 = nn.Upsample(scale_factor=4)
+        self.up2 = nn.Upsample(scale_factor=4)
         ##TODO: does this really has no relu?
         self.conv = nn.Sequential(
             nn.Conv2d(
@@ -249,12 +269,10 @@ class BGALayer(nn.Module):
         left2 = self.left2(x_d)
         right1 = self.right1(x_s)
         right2 = self.right2(x_s)
-        right1 = F.interpolate(
-            right1, size=dsize, mode='bilinear', align_corners=True)
+        right1 = self.up1(right1)
         left = left1 * torch.sigmoid(right1)
         right = left2 * torch.sigmoid(right2)
-        right = F.interpolate(
-            right, size=dsize, mode='bilinear', align_corners=True)
+        right = self.up2(right)
         out = self.conv(left + right)
         return out
 
@@ -262,38 +280,48 @@ class BGALayer(nn.Module):
 
 class SegmentHead(nn.Module):
 
-    def __init__(self, in_chan, mid_chan, n_classes):
+    def __init__(self, in_chan, mid_chan, n_classes, up_factor=8, aux=True):
         super(SegmentHead, self).__init__()
         self.conv = ConvBNReLU(in_chan, mid_chan, 3, stride=1)
         self.drop = nn.Dropout(0.1)
-        self.conv_out = nn.Conv2d(
-                mid_chan, n_classes, kernel_size=1, stride=1,
-                padding=0, bias=True)
+        self.up_factor = up_factor
 
-    def forward(self, x, size=None):
+        out_chan = n_classes * up_factor * up_factor
+        if aux:
+            self.conv_out = nn.Sequential(
+                ConvBNReLU(mid_chan, up_factor * up_factor, 3, stride=1),
+                nn.Conv2d(up_factor * up_factor, out_chan, 1, 1, 0),
+                nn.PixelShuffle(up_factor)
+            )
+        else:
+            self.conv_out = nn.Sequential(
+                nn.Conv2d(mid_chan, out_chan, 1, 1, 0),
+                nn.PixelShuffle(up_factor)
+            )
+
+    def forward(self, x):
         feat = self.conv(x)
         feat = self.drop(feat)
         feat = self.conv_out(feat)
-        if not size is None:
-            feat = F.interpolate(feat, size=size,
-                mode='bilinear', align_corners=True)
         return feat
 
 
 class BiSeNetV2(nn.Module):
 
-    def __init__(self, n_classes):
+    def __init__(self, n_classes, output_aux=True):
         super(BiSeNetV2, self).__init__()
+        self.output_aux = output_aux
         self.detail = DetailBranch()
         self.segment = SegmentBranch()
         self.bga = BGALayer()
 
         ## TODO: what is the number of mid chan ?
-        self.head = SegmentHead(128, 1024, n_classes)
-        self.aux2 = SegmentHead(16, 128, n_classes)
-        self.aux3 = SegmentHead(32, 128, n_classes)
-        self.aux4 = SegmentHead(64, 128, n_classes)
-        self.aux5_4 = SegmentHead(128, 128, n_classes)
+        self.head = SegmentHead(128, 1024, n_classes, up_factor=8, aux=False)
+        if self.output_aux:
+            self.aux2 = SegmentHead(16, 128, n_classes, up_factor=4)
+            self.aux3 = SegmentHead(32, 128, n_classes, up_factor=8)
+            self.aux4 = SegmentHead(64, 128, n_classes, up_factor=16)
+            self.aux5_4 = SegmentHead(128, 128, n_classes, up_factor=32)
 
         self.init_weights()
 
@@ -303,12 +331,15 @@ class BiSeNetV2(nn.Module):
         feat2, feat3, feat4, feat5_4, feat_s = self.segment(x)
         feat_head = self.bga(feat_d, feat_s)
 
-        logits = self.head(feat_head, size)
-        logits_aux2 = self.aux2(feat2, size)
-        logits_aux3 = self.aux3(feat3, size)
-        logits_aux4 = self.aux4(feat4, size)
-        logits_aux5_4 = self.aux5_4(feat5_4, size)
-        return logits, logits_aux2, logits_aux3, logits_aux4, logits_aux5_4
+        logits = self.head(feat_head)
+        if self.output_aux:
+            logits_aux2 = self.aux2(feat2)
+            logits_aux3 = self.aux3(feat3)
+            logits_aux4 = self.aux4(feat4)
+            logits_aux5_4 = self.aux5_4(feat5_4)
+            return logits, logits_aux2, logits_aux3, logits_aux4, logits_aux5_4
+        pred = logits.argmax(dim=1)
+        return pred
 
     def init_weights(self):
         for name, module in self.named_modules():
@@ -365,11 +396,13 @@ if __name__ == "__main__":
     #  feat = segment(x)[0]
     #  print(feat.size())
     #
-    x = torch.randn(16, 3, 512, 1024)
+    x = torch.randn(16, 3, 1024, 2048)
     model = BiSeNetV2(n_classes=19)
-    logits = model(x)[0]
-    print(logits.size())
+    outs = model(x)
+    for out in outs:
+        print(out.size())
+    #  print(logits.size())
 
-    for name, param in model.named_parameters():
-        if len(param.size()) == 1:
-            print(name)
+    #  for name, param in model.named_parameters():
+    #      if len(param.size()) == 1:
+    #          print(name)

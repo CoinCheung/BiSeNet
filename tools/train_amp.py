@@ -99,6 +99,7 @@ def set_model_dist(net):
     net = nn.parallel.DistributedDataParallel(
         net,
         device_ids=[local_rank, ],
+        #  find_unused_parameters=True,
         output_device=local_rank)
     return net
 
@@ -111,15 +112,6 @@ def set_meters():
             for i in range(cfg.num_aux_heads)]
     return time_meter, loss_meter, loss_pre_meter, loss_aux_meters
 
-
-def save_model(states, save_pth):
-    logger = logging.getLogger()
-    logger.info('\nsave models to {}'.format(save_pth))
-    for name, state in states.items():
-        save_name = 'model_final_{}.pth'.format(name)
-        modelpth = osp.join(save_pth, save_name)
-        if dist.is_initialized() and dist.get_rank() == 0:
-            torch.save(state, modelpth)
 
 
 def train():
