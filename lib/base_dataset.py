@@ -15,7 +15,8 @@ import lib.transform_cv2 as T
 from lib.sampler import RepeatedDistSampler
 
 
-
+## annroot -> train.txt
+## dataroot -> path to dataset
 class BaseDataset(Dataset):
     '''
     '''
