@@ -10,6 +10,7 @@ import logging
 import time
 import argparse
 import numpy as np
+from tqdm import tqdm
 from tabulate import tabulate
 
 import torch
@@ -161,7 +162,7 @@ def train():
         warmup_ratio=0.1, warmup='exp', last_epoch=-1,)
 
     ## train loop
-    for it, (im, lb) in enumerate(dl):
+    for it, (im, lb) in enumerate(tqdm(dl, desc='Training progress')):
         im = im.cuda()
         lb = lb.cuda()
 
