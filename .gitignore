@@ -111,4 +111,8 @@ preprocess_data.py
 res/
 adj.md
 tensorrt/build/*
+datasets/coco/train.txt
+datasets/coco/val.txt
+pretrained/*
+lib/coco.py
 

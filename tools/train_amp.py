@@ -29,11 +29,11 @@ from lib.logger import setup_logger, print_log_msg
 
 
 ## fix all random seeds
-torch.manual_seed(123)
-torch.cuda.manual_seed(123)
-np.random.seed(123)
-random.seed(123)
-torch.backends.cudnn.deterministic = True
+#  torch.manual_seed(123)
+#  torch.cuda.manual_seed(123)
+#  np.random.seed(123)
+#  random.seed(123)
+#  torch.backends.cudnn.deterministic = True
 #  torch.backends.cudnn.benchmark = True
 #  torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -68,11 +68,13 @@ def set_model():
 def set_optimizer(model):
     if hasattr(model, 'get_params'):
         wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params = model.get_params()
+        #  wd_val = cfg.weight_decay
+        wd_val = 0
         params_list = [
             {'params': wd_params, },
-            {'params': nowd_params, 'weight_decay': 0},
+            {'params': nowd_params, 'weight_decay': wd_val},
             {'params': lr_mul_wd_params, 'lr': cfg.lr_start * 10},
-            {'params': lr_mul_nowd_params, 'weight_decay': 0, 'lr': cfg.lr_start * 10},
+            {'params': lr_mul_nowd_params, 'weight_decay': wd_val, 'lr': cfg.lr_start * 10},
         ]
     else:
         wd_params, non_wd_params = [], []

@@ -24,7 +24,7 @@ class RepeatedDistSampler(Sampler):
         shuffle (optional): If true (default), sampler will shuffle the indices
     """
 
-    def __init__(self, dataset, num_imgs, num_replicas=None, rank=None, shuffle=True):
+    def __init__(self, dataset, num_imgs, num_replicas=None, rank=None, shuffle=True, ba=False):
         if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
@@ -40,6 +40,7 @@ class RepeatedDistSampler(Sampler):
         self.total_size = self.num_imgs_rank * self.num_replicas
         self.num_imgs = num_imgs
         self.shuffle = shuffle
+        self.ba = ba
 
 
     def __iter__(self):
@@ -57,6 +58,12 @@ class RepeatedDistSampler(Sampler):
         # add extra samples to make it evenly divisible
         indices = indices[:self.total_size]
         assert len(indices) == self.total_size
+
+        if self.ba:
+            n_rep = max(4, self.num_replicas)
+            len_ind = len(indices) // n_rep + 1
+            indices = indices[:len_ind]
+            indices = [ind for ind in indices for _ in range(n_rep)]
 
         # subsample
         indices = indices[self.rank:self.total_size:self.num_replicas]

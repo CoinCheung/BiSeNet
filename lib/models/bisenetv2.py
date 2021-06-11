@@ -41,6 +41,7 @@ class UpSample(nn.Module):
         nn.init.xavier_normal_(self.proj.weight, gain=1.)
 
 
+
 class DetailBranch(nn.Module):
 
     def __init__(self):
@@ -324,6 +325,7 @@ class BiSeNetV2(nn.Module):
             self.aux5_4 = SegmentHead(128, 128, n_classes, up_factor=32)
 
         self.init_weights()
+        self.load_pretrain()
 
     def forward(self, x):
         size = x.size()[2:]
@@ -352,6 +354,33 @@ class BiSeNetV2(nn.Module):
                 else:
                     nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
+
+    def load_pretrain(self):
+        state = torch.load('pretrained/bisenetv2_pretrain.pth', map_location='cpu')
+        state = {k:v for k,v in state.items() if not k in ('fc', 'head', 'dense_head')}
+        for name, child in self.named_children():
+            if name in state.keys():
+                child.load_state_dict(state[name])
+
+
+    def get_params(self):
+        wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params = [], [], [], []
+        for name, param in self.named_parameters():
+            if 'head' in name or 'aux' in name:
+                if param.dim() == 1:
+                    lr_mul_nowd_params.append(param)
+                elif param.dim() == 4:
+                    lr_mul_wd_params.append(param)
+                else:
+                    print(name)
+            else:
+                if param.dim() == 1:
+                    nowd_params.append(param)
+                elif param.dim() == 4:
+                    wd_params.append(param)
+                else:
+                    print(name)
+        return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
 
 
 if __name__ == "__main__":
