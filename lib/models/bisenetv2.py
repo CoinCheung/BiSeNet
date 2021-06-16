@@ -2,6 +2,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.model_zoo as modelzoo
+
+backbone_url = 'https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/backbone_v2.pth'
 
 
 class ConvBNReLU(nn.Module):
@@ -325,7 +328,6 @@ class BiSeNetV2(nn.Module):
             self.aux5_4 = SegmentHead(128, 128, n_classes, up_factor=32)
 
         self.init_weights()
-        self.load_pretrain()
 
     def forward(self, x):
         size = x.size()[2:]
@@ -354,13 +356,13 @@ class BiSeNetV2(nn.Module):
                 else:
                     nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
+        self.load_pretrain()
 
     def load_pretrain(self):
-        state = torch.load('pretrained/bisenetv2_pretrain.pth', map_location='cpu')
-        state = {k:v for k,v in state.items() if not k in ('fc', 'head', 'dense_head')}
+        state = modelzoo.load_url(backbone_url)
         for name, child in self.named_children():
             if name in state.keys():
-                child.load_state_dict(state[name])
+                child.load_state_dict(state[name], strict=True)
 
 
     def get_params(self):

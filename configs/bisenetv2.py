@@ -3,7 +3,7 @@
 cfg = dict(
     model_type='bisenetv2',
     num_aux_heads=4,
-    lr_start = 1 * 5e-3,
+    lr_start = 5e-3,
     weight_decay=5e-4,
     warmup_iters = 1000,
     max_iter = 150000,
