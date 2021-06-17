@@ -1,7 +1,6 @@
 
-from .bisenetv1 import cfg as bisenetv1_cfg
-from .bisenetv2 import cfg as bisenetv2_cfg
 
+import importlib
 
 
 class cfg_dict(object):
@@ -10,7 +9,12 @@ class cfg_dict(object):
         self.__dict__ = d
 
 
-cfg_factory = dict(
-    bisenetv1=cfg_dict(bisenetv1_cfg),
-    bisenetv2=cfg_dict(bisenetv2_cfg),
-)
+def set_cfg_from_file(cfg_path):
+    spec = importlib.util.spec_from_file_location('cfg_file', cfg_path)
+    cfg_file = importlib.util.module_from_spec(spec)
+    spec_loader = spec.loader.exec_module(cfg_file)
+    cfg = cfg_file.cfg
+    return cfg_dict(cfg)
+
+
+

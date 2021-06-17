@@ -6,13 +6,14 @@ sys.path.insert(0, '.')
 import torch
 
 from lib.models import model_factory
-from configs import cfg_factory
+from configs import set_cfg_from_file
 
 torch.set_grad_enabled(False)
 
 
 parse = argparse.ArgumentParser()
-parse.add_argument('--model', dest='model', type=str, default='bisenetv1',)
+parse.add_argument('--config', dest='config', type=str,
+        default='configs/bisenetv2.py',)
 parse.add_argument('--weight-path', dest='weight_pth', type=str,
         default='model_final.pth')
 parse.add_argument('--outpath', dest='out_pth', type=str,
@@ -20,7 +21,7 @@ parse.add_argument('--outpath', dest='out_pth', type=str,
 args = parse.parse_args()
 
 
-cfg = cfg_factory[args.model]
+cfg = set_cfg_from_file(args.config)
 if cfg.use_sync_bn: cfg.use_sync_bn = False
 
 net = model_factory[cfg.model_type](19, output_aux=False)

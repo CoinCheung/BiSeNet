@@ -20,7 +20,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 
 from lib.models import model_factory
-from configs import cfg_factory
+from configs import set_cfg_from_file
 from lib.logger import setup_logger
 from lib.cityscapes_cv2 import get_data_loader
 
@@ -262,13 +262,14 @@ def parse_args():
     parse.add_argument('--weight-path', dest='weight_pth', type=str,
                        default='model_final.pth',)
     parse.add_argument('--port', dest='port', type=int, default=44553,)
-    parse.add_argument('--model', dest='model', type=str, default='bisenetv2',)
+    parse.add_argument('--config', dest='config', type=str,
+            default='configs/bisenetv2.py',)
     return parse.parse_args()
 
 
 def main():
     args = parse_args()
-    cfg = cfg_factory[args.model]
+    cfg = set_cfg_from_file(args.config)
     if not args.local_rank == -1:
         torch.cuda.set_device(args.local_rank)
         dist.init_process_group(backend='nccl',

@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 import torch.cuda.amp as amp
 
 from lib.models import model_factory
-from configs import cfg_factory
+from configs import set_cfg_from_file
 from lib.cityscapes_cv2 import get_data_loader
 from evaluate import eval_model
 from lib.ohem_ce_loss import OhemCELoss
@@ -44,12 +44,13 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--local_rank', dest='local_rank', type=int, default=-1,)
     parse.add_argument('--port', dest='port', type=int, default=44554,)
-    parse.add_argument('--model', dest='model', type=str, default='bisenetv2',)
+    parse.add_argument('--config', dest='config', type=str,
+            default='configs/bisenetv2.py',)
     parse.add_argument('--finetune-from', type=str, default=None,)
     return parse.parse_args()
 
 args = parse_args()
-cfg = cfg_factory[args.model]
+cfg = set_cfg_from_file(args.config)
 
 
 

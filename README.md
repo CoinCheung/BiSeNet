@@ -29,7 +29,7 @@ My platform is like this:
 ## get start
 With a pretrained weight, you can run inference on an single image like this: 
 ```
-$ python tools/demo.py --model bisenetv2 --weight-path /path/to/your/weights.pth --img-path ./example.png
+$ python tools/demo.py --config configs/bisenetv2_city.py --weight-path /path/to/your/weights.pth --img-path ./example.png
 ```
 This would run inference on the image and save the result image to `./res.jpg`.
 
@@ -64,10 +64,10 @@ In order to train the model, you can run command like this:
 $ export CUDA_VISIBLE_DEVICES=0,1
 
 # if you want to train with apex
-$ python -m torch.distributed.launch --nproc_per_node=2 tools/train.py --model bisenetv2 # or bisenetv1
+$ python -m torch.distributed.launch --nproc_per_node=2 tools/train.py --config configs/bisenetv2_city.py # or bisenetv1
 
 # if you want to train with pytorch fp16 feature from torch 1.6
-$ python -m torch.distributed.launch --nproc_per_node=2 tools/train_amp.py --model bisenetv2 # or bisenetv1
+$ python -m torch.distributed.launch --nproc_per_node=2 tools/train_amp.py --config configs/bisenetv2_city.py # or bisenetv1
 ```
 
 Note that though `bisenetv2` has fewer flops, it requires much more training iterations. The the training time of `bisenetv1` is shorter.
@@ -77,17 +77,17 @@ Note that though `bisenetv2` has fewer flops, it requires much more training ite
 You can also load the trained model weights and finetune from it:
 ```
 $ export CUDA_VISIBLE_DEVICES=0,1
-$ python -m torch.distributed.launch --nproc_per_node=2 tools/train.py --finetune-from ./res/model_final.pth --model bisenetv2 # or bisenetv1
+$ python -m torch.distributed.launch --nproc_per_node=2 tools/train.py --finetune-from ./res/model_final.pth --config ./configs/bisenetv2_city.py # or bisenetv1
 
 # same with pytorch fp16 feature
-$ python -m torch.distributed.launch --nproc_per_node=2 tools/train_amp.py --finetune-from ./res/model_final.pth --model bisenetv2 # or bisenetv1
+$ python -m torch.distributed.launch --nproc_per_node=2 tools/train_amp.py --finetune-from ./res/model_final.pth --config ./configs/bisenetv2_city.py # or bisenetv1
 ```
 
 
 ## eval pretrained models
 You can also evaluate a trained model like this: 
 ```
-$ python tools/evaluate.py --model bisenetv1 --weight-path /path/to/your/weight.pth
+$ python tools/evaluate.py --config configs/bisenetv1_city.py --weight-path /path/to/your/weight.pth
 ```
 
 ## Infer with tensorrt

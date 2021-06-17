@@ -10,7 +10,7 @@ import cv2
 
 import lib.transform_cv2 as T
 from lib.models import model_factory
-from configs import cfg_factory
+from configs import set_cfg_from_file
 
 torch.set_grad_enabled(False)
 np.random.seed(123)
@@ -18,11 +18,11 @@ np.random.seed(123)
 
 # args
 parse = argparse.ArgumentParser()
-parse.add_argument('--model', dest='model', type=str, default='bisenetv2',)
+parse.add_argument('--config', dest='config', type=str, default='configs/bisenetv2.py',)
 parse.add_argument('--weight-path', type=str, default='./res/model_final.pth',)
 parse.add_argument('--img-path', dest='img_path', type=str, default='./example.png',)
 args = parse.parse_args()
-cfg = cfg_factory[args.model]
+cfg = set_cfg_from_file(args.config)
 
 
 palette = np.random.randint(0, 256, (256, 3), dtype=np.uint8)
