@@ -22,7 +22,7 @@ import torch.distributed as dist
 from lib.models import model_factory
 from configs import set_cfg_from_file
 from lib.logger import setup_logger
-from lib.cityscapes_cv2 import get_data_loader
+from lib.get_dataloader import get_data_loader
 
 
 
@@ -184,10 +184,9 @@ class MscEvalCrop(object):
 
 
 @torch.no_grad()
-def eval_model(net, ims_per_gpu, im_root, im_anns):
+def eval_model(cfg, net):
     is_dist = dist.is_initialized()
-    dl = get_data_loader(im_root, im_anns, ims_per_gpu, None,
-            None, mode='val', distributed=is_dist)
+    dl = get_data_loader(cfg, mode='val', distributed=is_dist)
     net.eval()
 
     heads, mious = [], []
@@ -251,7 +250,7 @@ def evaluate(cfg, weight_pth):
         )
 
     ## evaluator
-    heads, mious = eval_model(net, 2, cfg.im_root, cfg.val_im_anns)
+    heads, mious = eval_model(cfg, net)
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
 

@@ -20,7 +20,7 @@ import torch.cuda.amp as amp
 
 from lib.models import model_factory
 from configs import set_cfg_from_file
-from lib.cityscapes_cv2 import get_data_loader
+from lib.get_dataloader import get_data_loader
 from evaluate import eval_model
 from lib.ohem_ce_loss import OhemCELoss
 from lib.lr_scheduler import WarmupPolyLrScheduler
@@ -122,10 +122,7 @@ def train():
     is_dist = dist.is_initialized()
 
     ## dataset
-    dl = get_data_loader(
-            cfg.im_root, cfg.train_im_anns,
-            cfg.ims_per_gpu, cfg.scales, cfg.cropsize,
-            cfg.max_iter, mode='train', distributed=is_dist)
+    dl = get_data_loader(cfg, mode='train', distributed=is_dist)
 
     ## model
     net, criteria_pre, criteria_aux = set_model()
@@ -187,7 +184,7 @@ def train():
 
     logger.info('\nevaluating the final model')
     torch.cuda.empty_cache()
-    heads, mious = eval_model(net, 2, cfg.im_root, cfg.val_im_anns)
+    heads, mious = eval_model(cfg, net)
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
     return
