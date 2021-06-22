@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.cuda.amp as amp
 import torch.utils.model_zoo as modelzoo
 
 backbone_url = 'https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/backbone_v2.pth'
@@ -24,25 +25,6 @@ class ConvBNReLU(nn.Module):
         feat = self.bn(feat)
         feat = self.relu(feat)
         return feat
-
-
-class UpSample(nn.Module):
-
-    def __init__(self, n_chan, factor=2):
-        super(UpSample, self).__init__()
-        out_chan = n_chan * factor * factor
-        self.proj = nn.Conv2d(n_chan, out_chan, 1, 1, 0)
-        self.up = nn.PixelShuffle(factor)
-        self.init_weight()
-
-    def forward(self, x):
-        feat = self.proj(x)
-        feat = self.up(feat)
-        return feat
-
-    def init_weight(self):
-        nn.init.xavier_normal_(self.proj.weight, gain=1.)
-
 
 
 class DetailBranch(nn.Module):
@@ -273,10 +255,12 @@ class BGALayer(nn.Module):
         left2 = self.left2(x_d)
         right1 = self.right1(x_s)
         right2 = self.right2(x_s)
-        right1 = self.up1(right1)
+        #  right1 = self.up1(right1)
+        right1 = F.interpolate(right1, size=left1.size()[2:], mode='nearest')
         left = left1 * torch.sigmoid(right1)
         right = left2 * torch.sigmoid(right2)
-        right = self.up2(right)
+        #  right = self.up2(right)
+        right = F.interpolate(right, size=left.size()[2:], mode='nearest')
         out = self.conv(left + right)
         return out
 
@@ -284,48 +268,52 @@ class BGALayer(nn.Module):
 
 class SegmentHead(nn.Module):
 
-    def __init__(self, in_chan, mid_chan, n_classes, up_factor=8, aux=True):
+    def __init__(self, in_chan, mid_chan, n_classes):
         super(SegmentHead, self).__init__()
         self.conv = ConvBNReLU(in_chan, mid_chan, 3, stride=1)
         self.drop = nn.Dropout(0.1)
-        self.up_factor = up_factor
+        self.conv_out = nn.Conv2d(mid_chan, n_classes, 1, 1, 0, bias=True)
+        #  self.up_factor = up_factor
+        #
+        #  out_chan = n_classes * up_factor * up_factor
+        #  if aux:
+        #      self.conv_out = nn.Sequential(
+        #          ConvBNReLU(mid_chan, up_factor * up_factor, 3, stride=1),
+        #          nn.Conv2d(up_factor * up_factor, out_chan, 1, 1, 0),
+        #          nn.PixelShuffle(up_factor)
+        #      )
+        #  else:
+        #      self.conv_out = nn.Sequential(
+        #          nn.Conv2d(mid_chan, out_chan, 1, 1, 0),
+        #          nn.PixelShuffle(up_factor)
+        #      )
 
-        out_chan = n_classes * up_factor * up_factor
-        if aux:
-            self.conv_out = nn.Sequential(
-                ConvBNReLU(mid_chan, up_factor * up_factor, 3, stride=1),
-                nn.Conv2d(up_factor * up_factor, out_chan, 1, 1, 0),
-                nn.PixelShuffle(up_factor)
-            )
-        else:
-            self.conv_out = nn.Sequential(
-                nn.Conv2d(mid_chan, out_chan, 1, 1, 0),
-                nn.PixelShuffle(up_factor)
-            )
-
-    def forward(self, x):
+    def forward(self, x, size):
         feat = self.conv(x)
         feat = self.drop(feat)
         feat = self.conv_out(feat)
+        with amp.autocast(enabled=False):
+            feat = F.interpolate(feat, size=size,
+                    mode='bilinear', align_corners=False)
         return feat
 
 
 class BiSeNetV2(nn.Module):
 
-    def __init__(self, n_classes, aux_mode='train'):
+    def __init__(self, n_classes, output_aux=True):
         super(BiSeNetV2, self).__init__()
-        self.aux_mode = aux_mode
+        self.output_aux = output_aux
         self.detail = DetailBranch()
         self.segment = SegmentBranch()
         self.bga = BGALayer()
 
         ## TODO: what is the number of mid chan ?
-        self.head = SegmentHead(128, 1024, n_classes, up_factor=8, aux=False)
-        if self.aux_mode == 'train':
-            self.aux2 = SegmentHead(16, 128, n_classes, up_factor=4)
-            self.aux3 = SegmentHead(32, 128, n_classes, up_factor=8)
-            self.aux4 = SegmentHead(64, 128, n_classes, up_factor=16)
-            self.aux5_4 = SegmentHead(128, 128, n_classes, up_factor=32)
+        self.head = SegmentHead(128, 1024, n_classes)
+        if self.output_aux:
+            self.aux2 = SegmentHead(16, 128, n_classes)
+            self.aux3 = SegmentHead(32, 128, n_classes)
+            self.aux4 = SegmentHead(64, 128, n_classes)
+            self.aux5_4 = SegmentHead(128, 128, n_classes)
 
         self.init_weights()
 
@@ -335,20 +323,15 @@ class BiSeNetV2(nn.Module):
         feat2, feat3, feat4, feat5_4, feat_s = self.segment(x)
         feat_head = self.bga(feat_d, feat_s)
 
-        logits = self.head(feat_head)
-        if self.aux_mode == 'train':
-            logits_aux2 = self.aux2(feat2)
-            logits_aux3 = self.aux3(feat3)
-            logits_aux4 = self.aux4(feat4)
-            logits_aux5_4 = self.aux5_4(feat5_4)
+        logits = self.head(feat_head, size=size)
+        if self.output_aux:
+            logits_aux2 = self.aux2(feat2, size=size)
+            logits_aux3 = self.aux3(feat3, size=size)
+            logits_aux4 = self.aux4(feat4, size=size)
+            logits_aux5_4 = self.aux5_4(feat5_4, size=size)
             return logits, logits_aux2, logits_aux3, logits_aux4, logits_aux5_4
-        elif self.aux_mode == 'eval':
-            return logits,
-        elif self.aux_mode == 'pred':
-            pred = logits.argmax(dim=1)
-            return pred
-        else:
-            raise NotImplementedError
+        pred = logits.argmax(dim=1)
+        return pred
 
     def init_weights(self):
         for name, module in self.named_modules():
@@ -362,7 +345,6 @@ class BiSeNetV2(nn.Module):
                     nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
         self.load_pretrain()
-
 
     def load_pretrain(self):
         state = modelzoo.load_url(backbone_url)
@@ -392,47 +374,6 @@ class BiSeNetV2(nn.Module):
 
 
 if __name__ == "__main__":
-    #  x = torch.randn(16, 3, 1024, 2048)
-    #  detail = DetailBranch()
-    #  feat = detail(x)
-    #  print('detail', feat.size())
-    #
-    #  x = torch.randn(16, 3, 1024, 2048)
-    #  stem = StemBlock()
-    #  feat = stem(x)
-    #  print('stem', feat.size())
-    #
-    #  x = torch.randn(16, 128, 16, 32)
-    #  ceb = CEBlock()
-    #  feat = ceb(x)
-    #  print(feat.size())
-    #
-    #  x = torch.randn(16, 32, 16, 32)
-    #  ge1 = GELayerS1(32, 32)
-    #  feat = ge1(x)
-    #  print(feat.size())
-    #
-    #  x = torch.randn(16, 16, 16, 32)
-    #  ge2 = GELayerS2(16, 32)
-    #  feat = ge2(x)
-    #  print(feat.size())
-    #
-    #  left = torch.randn(16, 128, 64, 128)
-    #  right = torch.randn(16, 128, 16, 32)
-    #  bga = BGALayer()
-    #  feat = bga(left, right)
-    #  print(feat.size())
-    #
-    #  x = torch.randn(16, 128, 64, 128)
-    #  head = SegmentHead(128, 128, 19)
-    #  logits = head(x)
-    #  print(logits.size())
-    #
-    #  x = torch.randn(16, 3, 1024, 2048)
-    #  segment = SegmentBranch()
-    #  feat = segment(x)[0]
-    #  print(feat.size())
-    #
     x = torch.randn(16, 3, 1024, 2048)
     model = BiSeNetV2(n_classes=19)
     outs = model(x)

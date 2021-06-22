@@ -6,6 +6,7 @@ import torch.distributed as dist
 from lib.sampler import RepeatedDistSampler
 from lib.base_dataset import TransformationTrain, TransformationVal
 from lib.cityscapes_cv2 import CityScapes
+from lib.coco import CocoStuff
 
 
 def get_data_loader(cfg, mode='train', distributed=True):

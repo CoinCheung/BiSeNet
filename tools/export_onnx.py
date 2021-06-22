@@ -24,7 +24,7 @@ args = parse.parse_args()
 cfg = set_cfg_from_file(args.config)
 if cfg.use_sync_bn: cfg.use_sync_bn = False
 
-net = model_factory[cfg.model_type](19, output_aux=False)
+net = model_factory[cfg.model_type](19, aux_mode='pred')
 net.load_state_dict(torch.load(args.weight_pth), strict=False)
 net.eval()
 
@@ -36,5 +36,5 @@ output_names = ['preds',]
 
 torch.onnx.export(net, dummy_input, args.out_pth,
     input_names=input_names, output_names=output_names,
-    verbose=False, opset_version=10)
+    verbose=False, opset_version=11)
 

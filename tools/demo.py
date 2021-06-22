@@ -28,7 +28,7 @@ cfg = set_cfg_from_file(args.config)
 palette = np.random.randint(0, 256, (256, 3), dtype=np.uint8)
 
 # define model
-net = model_factory[cfg.model_type](19)
+net = model_factory[cfg.model_type](cfg.n_cats, aux_mode='pred')
 net.load_state_dict(torch.load(args.weight_path, map_location='cpu'))
 net.eval()
 net.cuda()
@@ -42,6 +42,6 @@ im = cv2.imread(args.img_path)[:, :, ::-1]
 im = to_tensor(dict(im=im, lb=None))['im'].unsqueeze(0).cuda()
 
 # inference
-out = net(im)[0].argmax(dim=1).squeeze().detach().cpu().numpy()
+out = net(im).squeeze().detach().cpu().numpy()
 pred = palette[out]
 cv2.imwrite('./res.jpg', pred)

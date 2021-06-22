@@ -2,11 +2,11 @@
 ### My platform
 
 * ubuntu 18.04
-* nvidia Tesla T4 gpu, driver 450.51.05
-* cuda 10.2, cudnn 7
+* nvidia Tesla T4 gpu, driver newer than 440
+* cuda 10.2, cudnn 8
 * cmake 3.10.2
 * opencv built from source
-* tensorrt 7.0.0
+* tensorrt 7.2.3.4
 
 
 ### Export model to onnx

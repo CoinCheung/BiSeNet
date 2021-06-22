@@ -55,7 +55,7 @@ cfg = set_cfg_from_file(args.config)
 
 
 def set_model():
-    net = model_factory[cfg.model_type](19)
+    net = model_factory[cfg.model_type](cfg.n_cats)
     if not args.finetune_from is None:
         net.load_state_dict(torch.load(args.finetune_from, map_location='cpu'))
     if cfg.use_sync_bn: net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
@@ -184,7 +184,7 @@ def train():
 
     logger.info('\nevaluating the final model')
     torch.cuda.empty_cache()
-    heads, mious = eval_model(cfg, net)
+    heads, mious = eval_model(cfg, net.module)
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
     return

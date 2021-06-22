@@ -40,7 +40,7 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, idx):
         impth, lbpth = self.img_paths[idx], self.lb_paths[idx]
-        img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
+        img, label = self.get_image(impth, lbpth)
         if not self.lb_map is None:
             label = self.lb_map[label]
         im_lb = dict(im=img, lb=label)
@@ -49,6 +49,10 @@ class BaseDataset(Dataset):
         im_lb = self.to_tensor(im_lb)
         img, label = im_lb['im'], im_lb['lb']
         return img.detach(), label.unsqueeze(0).detach()
+
+    def get_image(self, impth, lbpth):
+        img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
+        return img, label
 
     def __len__(self):
         return self.len
