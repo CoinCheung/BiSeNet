@@ -2,14 +2,12 @@
 ## bisenetv2
 cfg = dict(
     model_type='bisenetv2',
-    n_cats=192,
+    n_cats=182,
     num_aux_heads=4,
     lr_start=5e-3,
     weight_decay=1e-4,
     warmup_iters=1000,
     max_iter=20000,
-    #  warmup_iters=10,
-    #  max_iter=20,
     dataset='CocoStuff',
     im_root='./datasets/coco',
     train_im_anns='./datasets/coco/train.txt',

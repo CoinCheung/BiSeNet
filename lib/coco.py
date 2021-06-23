@@ -13,7 +13,7 @@ import numpy as np
 
 import lib.transform_cv2 as T
 from lib.sampler import RepeatedDistSampler
-from lib.base_dataset import BaseDataset, TransformationTrain, TransformationVal
+from lib.base_dataset import BaseDataset
 
 '''
 91 + 91 = 182 classes, label proportions are:
