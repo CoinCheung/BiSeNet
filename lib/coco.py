@@ -16,7 +16,7 @@ from lib.sampler import RepeatedDistSampler
 from lib.base_dataset import BaseDataset
 
 '''
-91 + 91 = 182 classes, label proportions are:
+91(thing) + 91(stuff) = 182 classes, label proportions are:
     [0.0901445377, 0.00157896236, 0.00611962763, 0.00494526505, 0.00335260064, 0.00765355955, 0.00772972804, 0.00631509744,
      0.00270457286, 0.000697793344, 0.00114085574, 0.0, 0.00114084131, 0.000705729068, 0.00359758029, 0.00162208938, 0.00598373796,
      0.00440213609, 0.00362085441, 0.00193052224, 0.00271001196, 0.00492864603, 0.00186985393, 0.00332902228, 0.00334420294, 0.0,
@@ -38,7 +38,9 @@ from lib.base_dataset import BaseDataset
      0.00112924659, 0.001457768, 0.00190406757, 0.00173232644, 0.0116980759, 0.000850599027, 0.00565381261, 0.000787379463, 0.0577763754,
      0.00214883711, 0.00553984356, 0.0443605019, 0.0218570174, 0.0027310644, 0.00225446528, 0.00903008323, 0.00644298871, 0.00442167269,
      0.000129279566, 0.00176047379, 0.0101637834, 0.00255549522]
-11 classes has no annos, proportions are 0
+
+11 thing classes has no annos, proportions are 0:
+    [11, 25, 28, 29, 44, 65, 67, 68, 70, 82, 90]
 '''
 
 
@@ -47,9 +49,15 @@ class CocoStuff(BaseDataset):
 
     def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
         super(CocoStuff, self).__init__(dataroot, annpath, trans_func, mode)
-        self.n_cats = 182 # 91 stuff, 91 thing, 11 of thing have no annos
+        self.n_cats = 171 # 91 stuff, 91 thing, 11 of thing have no annos
         self.lb_ignore = 255
-        self.lb_map = None
+
+        ## label mapping, remove non-existing labels
+        missing = [11, 25, 28, 29, 44, 65, 67, 68, 70, 82, 90]
+        remain = [ind for ind in range(182) if not ind in missing]
+        self.lb_map = np.arange(256)
+        for ind in remain:
+            self.lb_map[ind] = remain.index(ind)
 
         self.to_tensor = T.ToTensor(
             mean=(0.46962251, 0.4464104,  0.40718787), # coco, rgb

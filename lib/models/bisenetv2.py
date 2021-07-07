@@ -290,18 +290,17 @@ class SegmentHead(nn.Module):
         self.drop = nn.Dropout(0.1)
         self.up_factor = up_factor
 
-        out_chan = n_classes * up_factor * up_factor
-        if aux:
-            self.conv_out = nn.Sequential(
-                ConvBNReLU(mid_chan, up_factor * up_factor, 3, stride=1),
-                nn.Conv2d(up_factor * up_factor, out_chan, 1, 1, 0),
-                nn.PixelShuffle(up_factor)
-            )
-        else:
-            self.conv_out = nn.Sequential(
-                nn.Conv2d(mid_chan, out_chan, 1, 1, 0),
-                nn.PixelShuffle(up_factor)
-            )
+        out_chan = n_classes
+        mid_chan2 = up_factor * up_factor if aux else mid_chan
+        up_factor = up_factor // 2 if aux else up_factor
+        self.conv_out = nn.Sequential(
+            nn.Sequential(
+                nn.Upsample(scale_factor=2),
+                ConvBNReLU(mid_chan, mid_chan2, 3, stride=1)
+                ) if aux else nn.Identity(),
+            nn.Conv2d(mid_chan2, out_chan, 1, 1, 0, bias=True),
+            nn.Upsample(scale_factor=up_factor, mode='bilinear', align_corners=False)
+        )
 
     def forward(self, x):
         feat = self.conv(x)
@@ -370,25 +369,24 @@ class BiSeNetV2(nn.Module):
             if name in state.keys():
                 child.load_state_dict(state[name], strict=True)
 
-
     def get_params(self):
-        wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params = [], [], [], []
-        for name, param in self.named_parameters():
-            if 'head' in name or 'aux' in name:
-                if param.dim() == 1:
-                    lr_mul_nowd_params.append(param)
-                elif param.dim() == 4:
-                    lr_mul_wd_params.append(param)
-                else:
-                    print(name)
-            else:
+        def add_param_to_list(mod, wd_params, nowd_params):
+            for param in mod.parameters():
                 if param.dim() == 1:
                     nowd_params.append(param)
                 elif param.dim() == 4:
                     wd_params.append(param)
                 else:
                     print(name)
+
+        wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params = [], [], [], []
+        for name, child in self.named_children():
+            if 'head' in name or 'aux' in name:
+                add_param_to_list(child, lr_mul_wd_params, lr_mul_nowd_params)
+            else:
+                add_param_to_list(child, wd_params, nowd_params)
         return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
+
 
 
 if __name__ == "__main__":

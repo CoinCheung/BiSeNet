@@ -76,7 +76,7 @@ class MscEvalV0(object):
         if dist.is_initialized():
             dist.all_reduce(hist, dist.ReduceOp.SUM)
         ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
-        miou = ious.mean()
+        miou = np.nanmean(ious.detach().cpu().numpy())
         return miou.item()
 
 
@@ -183,7 +183,7 @@ class MscEvalCrop(object):
         if self.distributed:
             dist.all_reduce(hist, dist.ReduceOp.SUM)
         ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
-        miou = ious.mean()
+        miou = np.nanmean(ious.detach().cpu().numpy())
         return miou.item()
 
 

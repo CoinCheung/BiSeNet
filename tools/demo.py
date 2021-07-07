@@ -29,7 +29,7 @@ palette = np.random.randint(0, 256, (256, 3), dtype=np.uint8)
 
 # define model
 net = model_factory[cfg.model_type](cfg.n_cats, aux_mode='pred')
-net.load_state_dict(torch.load(args.weight_path, map_location='cpu'))
+net.load_state_dict(torch.load(args.weight_path, map_location='cpu'), strict=False)
 net.eval()
 net.cuda()
 

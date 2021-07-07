@@ -62,10 +62,11 @@ class BiSeNetOutput(nn.Module):
     def __init__(self, in_chan, mid_chan, n_classes, up_factor=32, *args, **kwargs):
         super(BiSeNetOutput, self).__init__()
         self.up_factor = up_factor
-        out_chan = n_classes * up_factor * up_factor
+        out_chan = n_classes
         self.conv = ConvBNReLU(in_chan, mid_chan, ks=3, stride=1, padding=1)
         self.conv_out = nn.Conv2d(mid_chan, out_chan, kernel_size=1, bias=True)
-        self.up = nn.PixelShuffle(up_factor)
+        self.up = nn.Upsample(scale_factor=up_factor,
+                mode='bilinear', align_corners=False)
         self.init_weight()
 
     def forward(self, x):

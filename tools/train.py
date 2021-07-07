@@ -195,7 +195,8 @@ def train():
     save_pth = osp.join(cfg.respth, 'model_final.pth')
     logger.info('\nsave models to {}'.format(save_pth))
     state = net.module.state_dict()
-    if dist.get_rank() == 0: torch.save(state, save_pth)
+    if dist.get_rank() == 0:
+        torch.save(state, save_pth, _use_new_zipfile_serialization=False)
 
     logger.info('\nevaluating the final model')
     torch.cuda.empty_cache()

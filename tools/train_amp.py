@@ -55,8 +55,10 @@ cfg = set_cfg_from_file(args.config)
 
 
 def set_model():
+    logger = logging.getLogger()
     net = model_factory[cfg.model_type](cfg.n_cats)
     if not args.finetune_from is None:
+        logger.info(f'load pretrained weights from {args.finetune_from}')
         net.load_state_dict(torch.load(args.finetune_from, map_location='cpu'))
     if cfg.use_sync_bn: net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
     net.cuda()
@@ -103,7 +105,8 @@ def set_model_dist(net):
         net,
         device_ids=[local_rank, ],
         #  find_unused_parameters=True,
-        output_device=local_rank)
+        output_device=local_rank
+        )
     return net
 
 
@@ -199,7 +202,7 @@ def main():
         rank=args.local_rank
     )
     if not osp.exists(cfg.respth): os.makedirs(cfg.respth)
-    setup_logger('{}-train'.format(cfg.model_type), cfg.respth)
+    setup_logger(f'{cfg.model_type}-{cfg.dataset.lower()}-train', cfg.respth)
     train()
 
 
