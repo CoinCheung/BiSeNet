@@ -63,5 +63,5 @@ Likewise, you do not need to worry about this anymore with 7.2.3.4.
 3. The speed(fps) is tested on a single nvidia Tesla T4 gpu with `batchsize=1` and `cropsize=(1024,2048)`. Please note that T4 gpu is almost 2 times slower than 2080ti, you should evaluate the speed considering your own platform and cropsize. Also note that the performance would be affected if your gpu is concurrently working on other tasks. Please make sure no other program is running on your gpu when you test the speed.
 
 4. ~On my platform, after compiling with tensorrt, the model size of bisenetv1 is 33Mb(fp16) and 133Mb(fp32), and the size of bisenetv2 is 29Mb(fp16) and 54Mb(fp32). However, the fps of bisenetv1 is 60(fp16) and 19(fp32), while the fps of bisenetv2 is 50(fp16) and 16(fp32). It is obvious that bisenetv2 has fewer parameters than bisenetv1, but the speed is otherwise. I am not sure whether it is because tensorrt has worse optimization strategy in some ops used in bisenetv2(such as depthwise convolution) or because of the limitation of the gpu on different ops. Please tell me if you have better idea on this.~  
-Not tested with new implementation.
+Not tested.
 
