@@ -55,7 +55,7 @@ $ unzip leftImg8bit_trainvaltest.zip
 $ unzip gtFine_trainvaltest.zip
 ```
 
-2. cocostuff 
+2. cocostuff   
 Download `train2017.zip`, `val2017.zip` and `stuffthingmaps_trainval2017.zip` split from official [website](https://cocodataset.org/#download). Then do as following:
 ```
 $ unzip train2017.zip
