@@ -2,17 +2,17 @@
 ### My platform
 
 * ubuntu 18.04
-* nvidia Tesla T4 gpu, driver 450.51.05
-* cuda 10.2, cudnn 7
+* nvidia Tesla T4 gpu, driver newer than 440
+* cuda 10.2, cudnn 8
 * cmake 3.10.2
 * opencv built from source
-* tensorrt 7.0.0
+* tensorrt 7.2.3.4
 
 
 ### Export model to onnx
 I export the model like this:  
 ```
-$ python tools/export_onnx.py --model bisenetv1 --weight-path /path/to/your/model.pth --outpath ./model.onnx 
+$ python tools/export_onnx.py --config configs/bisenetv2_city.py --weight-path /path/to/your/model.pth --outpath ./model.onnx 
 ```
 
 **NOTE:** I use cropsize of `1024x2048` here in my example, you should change it according to your specific application. The inference cropsize is fixed from this step on, so you should decide the inference cropsize when you export the model here.
@@ -54,11 +54,14 @@ $ ./segment test /path/to/saved_model.trt
 
 
 ## Tips:  
-1. Since tensorrt 7.0.0 cannot parse well the `bilinear interpolation` op exported from pytorch, I replace them with pytorch `nn.PixelShuffle`, which would bring some performance overhead(more flops and parameters), and make inference a bit slower. Also due to the `nn.PixelShuffle` op, you **must** export the onnx model with input size to be *n* times of 32.
+1. ~Since tensorrt 7.0.0 cannot parse well the `bilinear interpolation` op exported from pytorch, I replace them with pytorch `nn.PixelShuffle`, which would bring some performance overhead(more flops and parameters), and make inference a bit slower. Also due to the `nn.PixelShuffle` op, you **must** export the onnx model with input size to be *n* times of 32.~   
+If you are using 7.2.3.4, you should not have problem with `interpolate` anymore.
 
-2. There would be some problem for tensorrt 7.0.0 to parse the `nn.AvgPool2d` op from pytorch with onnx opset11. So I use opset10 to export the model. 
+2. ~There would be some problem for tensorrt 7.0.0 to parse the `nn.AvgPool2d` op from pytorch with onnx opset11. So I use opset10 to export the model.~  
+Likewise, you do not need to worry about this anymore with 7.2.3.4.
 
-4. The speed(fps) is tested on a single nvidia Tesla T4 gpu with `batchsize=1` and `cropsize=(1024,2048)`. Please note that T4 gpu is almost 2 times slower than 2080ti, you should evaluate the speed considering your own platform and cropsize. Also note that the performance would be affected if your gpu is concurrently working on other tasks. Please make sure no other program is running on your gpu when you test the speed.
+3. The speed(fps) is tested on a single nvidia Tesla T4 gpu with `batchsize=1` and `cropsize=(1024,2048)`. Please note that T4 gpu is almost 2 times slower than 2080ti, you should evaluate the speed considering your own platform and cropsize. Also note that the performance would be affected if your gpu is concurrently working on other tasks. Please make sure no other program is running on your gpu when you test the speed.
 
-5. On my platform, after compiling with tensorrt, the model size of bisenetv1 is 33Mb(fp16) and 133Mb(fp32), and the size of bisenetv2 is 29Mb(fp16) and 54Mb(fp32). However, the fps of bisenetv1 is 60(fp16) and 19(fp32), while the fps of bisenetv2 is 50(fp16) and 16(fp32). It is obvious that bisenetv2 has fewer parameters than bisenetv1, but the speed is otherwise. I am not sure whether it is because tensorrt has worse optimization strategy in some ops used in bisenetv2(such as depthwise convolution) or because of the limitation of the gpu on different ops. Please tell me if you have better idea on this.
+4. ~On my platform, after compiling with tensorrt, the model size of bisenetv1 is 33Mb(fp16) and 133Mb(fp32), and the size of bisenetv2 is 29Mb(fp16) and 54Mb(fp32). However, the fps of bisenetv1 is 60(fp16) and 19(fp32), while the fps of bisenetv2 is 50(fp16) and 16(fp32). It is obvious that bisenetv2 has fewer parameters than bisenetv1, but the speed is otherwise. I am not sure whether it is because tensorrt has worse optimization strategy in some ops used in bisenetv2(such as depthwise convolution) or because of the limitation of the gpu on different ops. Please tell me if you have better idea on this.~  
+Not tested.
 

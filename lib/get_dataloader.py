@@ -3,9 +3,36 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.distributed as dist
 
+import lib.transform_cv2 as T
 from lib.sampler import RepeatedDistSampler
-from lib.base_dataset import TransformationTrain, TransformationVal
 from lib.cityscapes_cv2 import CityScapes
+from lib.coco import CocoStuff
+
+
+
+class TransformationTrain(object):
+
+    def __init__(self, scales, cropsize):
+        self.trans_func = T.Compose([
+            T.RandomResizedCrop(scales, cropsize),
+            T.RandomHorizontalFlip(),
+            T.ColorJitter(
+                brightness=0.4,
+                contrast=0.4,
+                saturation=0.4
+            ),
+        ])
+
+    def __call__(self, im_lb):
+        im_lb = self.trans_func(im_lb)
+        return im_lb
+
+
+class TransformationVal(object):
+
+    def __call__(self, im_lb):
+        im, lb = im_lb['im'], im_lb['lb']
+        return dict(im=im, lb=lb)
 
 
 def get_data_loader(cfg, mode='train', distributed=True):

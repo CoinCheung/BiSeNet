@@ -11,7 +11,6 @@ import torch.distributed as dist
 import cv2
 import numpy as np
 
-import lib.transform_cv2 as T
 from lib.sampler import RepeatedDistSampler
 
 
@@ -40,7 +39,7 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, idx):
         impth, lbpth = self.img_paths[idx], self.lb_paths[idx]
-        img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
+        img, label = self.get_image(impth, lbpth)
         if not self.lb_map is None:
             label = self.lb_map[label]
         im_lb = dict(im=img, lb=label)
@@ -50,33 +49,12 @@ class BaseDataset(Dataset):
         img, label = im_lb['im'], im_lb['lb']
         return img.detach(), label.unsqueeze(0).detach()
 
+    def get_image(self, impth, lbpth):
+        img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
+        return img, label
+
     def __len__(self):
         return self.len
-
-
-class TransformationTrain(object):
-
-    def __init__(self, scales, cropsize):
-        self.trans_func = T.Compose([
-            T.RandomResizedCrop(scales, cropsize),
-            T.RandomHorizontalFlip(),
-            T.ColorJitter(
-                brightness=0.4,
-                contrast=0.4,
-                saturation=0.4
-            ),
-        ])
-
-    def __call__(self, im_lb):
-        im_lb = self.trans_func(im_lb)
-        return im_lb
-
-
-class TransformationVal(object):
-
-    def __call__(self, im_lb):
-        im, lb = im_lb['im'], im_lb['lb']
-        return dict(im=im, lb=lb)
 
 
 if __name__ == "__main__":

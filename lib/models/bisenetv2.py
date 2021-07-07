@@ -290,18 +290,17 @@ class SegmentHead(nn.Module):
         self.drop = nn.Dropout(0.1)
         self.up_factor = up_factor
 
-        out_chan = n_classes * up_factor * up_factor
-        if aux:
-            self.conv_out = nn.Sequential(
-                ConvBNReLU(mid_chan, up_factor * up_factor, 3, stride=1),
-                nn.Conv2d(up_factor * up_factor, out_chan, 1, 1, 0),
-                nn.PixelShuffle(up_factor)
-            )
-        else:
-            self.conv_out = nn.Sequential(
-                nn.Conv2d(mid_chan, out_chan, 1, 1, 0),
-                nn.PixelShuffle(up_factor)
-            )
+        out_chan = n_classes
+        mid_chan2 = up_factor * up_factor if aux else mid_chan
+        up_factor = up_factor // 2 if aux else up_factor
+        self.conv_out = nn.Sequential(
+            nn.Sequential(
+                nn.Upsample(scale_factor=2),
+                ConvBNReLU(mid_chan, mid_chan2, 3, stride=1)
+                ) if aux else nn.Identity(),
+            nn.Conv2d(mid_chan2, out_chan, 1, 1, 0, bias=True),
+            nn.Upsample(scale_factor=up_factor, mode='bilinear', align_corners=False)
+        )
 
     def forward(self, x):
         feat = self.conv(x)
@@ -312,16 +311,16 @@ class SegmentHead(nn.Module):
 
 class BiSeNetV2(nn.Module):
 
-    def __init__(self, n_classes, output_aux=True):
+    def __init__(self, n_classes, aux_mode='train'):
         super(BiSeNetV2, self).__init__()
-        self.output_aux = output_aux
+        self.aux_mode = aux_mode
         self.detail = DetailBranch()
         self.segment = SegmentBranch()
         self.bga = BGALayer()
 
         ## TODO: what is the number of mid chan ?
         self.head = SegmentHead(128, 1024, n_classes, up_factor=8, aux=False)
-        if self.output_aux:
+        if self.aux_mode == 'train':
             self.aux2 = SegmentHead(16, 128, n_classes, up_factor=4)
             self.aux3 = SegmentHead(32, 128, n_classes, up_factor=8)
             self.aux4 = SegmentHead(64, 128, n_classes, up_factor=16)
@@ -336,14 +335,19 @@ class BiSeNetV2(nn.Module):
         feat_head = self.bga(feat_d, feat_s)
 
         logits = self.head(feat_head)
-        if self.output_aux:
+        if self.aux_mode == 'train':
             logits_aux2 = self.aux2(feat2)
             logits_aux3 = self.aux3(feat3)
             logits_aux4 = self.aux4(feat4)
             logits_aux5_4 = self.aux5_4(feat5_4)
             return logits, logits_aux2, logits_aux3, logits_aux4, logits_aux5_4
-        pred = logits.argmax(dim=1)
-        return pred
+        elif self.aux_mode == 'eval':
+            return logits,
+        elif self.aux_mode == 'pred':
+            pred = logits.argmax(dim=1)
+            return pred
+        else:
+            raise NotImplementedError
 
     def init_weights(self):
         for name, module in self.named_modules():
@@ -358,31 +362,31 @@ class BiSeNetV2(nn.Module):
                 nn.init.zeros_(module.bias)
         self.load_pretrain()
 
+
     def load_pretrain(self):
         state = modelzoo.load_url(backbone_url)
         for name, child in self.named_children():
             if name in state.keys():
                 child.load_state_dict(state[name], strict=True)
 
-
     def get_params(self):
-        wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params = [], [], [], []
-        for name, param in self.named_parameters():
-            if 'head' in name or 'aux' in name:
-                if param.dim() == 1:
-                    lr_mul_nowd_params.append(param)
-                elif param.dim() == 4:
-                    lr_mul_wd_params.append(param)
-                else:
-                    print(name)
-            else:
+        def add_param_to_list(mod, wd_params, nowd_params):
+            for param in mod.parameters():
                 if param.dim() == 1:
                     nowd_params.append(param)
                 elif param.dim() == 4:
                     wd_params.append(param)
                 else:
                     print(name)
+
+        wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params = [], [], [], []
+        for name, child in self.named_children():
+            if 'head' in name or 'aux' in name:
+                add_param_to_list(child, lr_mul_wd_params, lr_mul_nowd_params)
+            else:
+                add_param_to_list(child, wd_params, nowd_params)
         return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
+
 
 
 if __name__ == "__main__":

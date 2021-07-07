@@ -1,6 +1,7 @@
 
 cfg = dict(
     model_type='bisenetv1',
+    n_cats=19,
     num_aux_heads=2,
     lr_start=1e-2,
     weight_decay=5e-4,
@@ -12,6 +13,8 @@ cfg = dict(
     val_im_anns='./datasets/cityscapes/val.txt',
     scales=[0.75, 2.],
     cropsize=[1024, 1024],
+    eval_crop=[1024, 1024],
+    eval_scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75],
     ims_per_gpu=8,
     eval_ims_per_gpu=2,
     use_fp16=True,

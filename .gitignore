@@ -114,5 +114,5 @@ tensorrt/build/*
 datasets/coco/train.txt
 datasets/coco/val.txt
 pretrained/*
-lib/coco.py
+dist_train.sh
 

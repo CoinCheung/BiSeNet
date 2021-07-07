@@ -25,6 +25,9 @@ from lib.logger import setup_logger
 from lib.get_dataloader import get_data_loader
 
 
+def get_round_size(size, divisor=32):
+    return [math.ceil(el / divisor) * divisor for el in size]
+
 
 class MscEvalV0(object):
 
@@ -48,6 +51,7 @@ class MscEvalV0(object):
                     (N, n_classes, H, W), dtype=torch.float32).cuda().detach()
             for scale in self.scales:
                 sH, sW = int(scale * H), int(scale * W)
+                sH, sW = get_round_size((sH, sW))
                 im_sc = F.interpolate(imgs, size=(sH, sW),
                         mode='bilinear', align_corners=True)
 
@@ -72,7 +76,7 @@ class MscEvalV0(object):
         if dist.is_initialized():
             dist.all_reduce(hist, dist.ReduceOp.SUM)
         ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
-        miou = ious.mean()
+        miou = np.nanmean(ious.detach().cpu().numpy())
         return miou.item()
 
 
@@ -162,6 +166,7 @@ class MscEvalCrop(object):
             imgs = imgs.cuda()
             label = label.squeeze(1).cuda()
             N, H, W = label.shape
+
             probs = torch.zeros((N, n_classes, H, W)).cuda()
             probs.requires_grad_(False)
             for sc in self.scales:
@@ -178,13 +183,16 @@ class MscEvalCrop(object):
         if self.distributed:
             dist.all_reduce(hist, dist.ReduceOp.SUM)
         ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
-        miou = ious.mean()
+        miou = np.nanmean(ious.detach().cpu().numpy())
         return miou.item()
 
 
 
 @torch.no_grad()
 def eval_model(cfg, net):
+    org_aux = net.aux_mode
+    net.aux_mode = 'eval'
+
     is_dist = dist.is_initialized()
     dl = get_data_loader(cfg, mode='val', distributed=is_dist)
     net.eval()
@@ -193,40 +201,42 @@ def eval_model(cfg, net):
     logger = logging.getLogger()
 
     single_scale = MscEvalV0((1., ), False)
-    mIOU = single_scale(net, dl, 19)
+    mIOU = single_scale(net, dl, cfg.n_cats)
     heads.append('single_scale')
     mious.append(mIOU)
     logger.info('single mIOU is: %s\n', mIOU)
 
     single_crop = MscEvalCrop(
-        cropsize=1024,
+        cropsize=cfg.eval_crop,
         cropstride=2. / 3,
         flip=False,
         scales=(1., ),
         lb_ignore=255,
     )
-    mIOU = single_crop(net, dl, 19)
+    mIOU = single_crop(net, dl, cfg.n_cats)
     heads.append('single_scale_crop')
     mious.append(mIOU)
     logger.info('single scale crop mIOU is: %s\n', mIOU)
 
-    ms_flip = MscEvalV0((0.5, 0.75, 1, 1.25, 1.5, 1.75), True)
-    mIOU = ms_flip(net, dl, 19)
+    ms_flip = MscEvalV0(cfg.eval_scales, True)
+    mIOU = ms_flip(net, dl, cfg.n_cats)
     heads.append('ms_flip')
     mious.append(mIOU)
     logger.info('ms flip mIOU is: %s\n', mIOU)
 
     ms_flip_crop = MscEvalCrop(
-        cropsize=1024,
+        cropsize=cfg.eval_crop,
         cropstride=2. / 3,
         flip=True,
-        scales=(0.5, 0.75, 1.0, 1.25, 1.5, 1.75),
+        scales=cfg.eval_scales,
         lb_ignore=255,
     )
-    mIOU = ms_flip_crop(net, dl, 19)
+    mIOU = ms_flip_crop(net, dl, cfg.n_cats)
     heads.append('ms_flip_crop')
     mious.append(mIOU)
     logger.info('ms crop mIOU is: %s\n', mIOU)
+
+    net.aux_mode = org_aux
     return heads, mious
 
 
@@ -235,9 +245,8 @@ def evaluate(cfg, weight_pth):
 
     ## model
     logger.info('setup and restore model')
-    net = model_factory[cfg.model_type](19)
-    #  net = BiSeNetV2(19)
-    net.load_state_dict(torch.load(weight_pth))
+    net = model_factory[cfg.model_type](cfg.n_cats)
+    net.load_state_dict(torch.load(weight_pth, map_location='cpu'))
     net.cuda()
 
     is_dist = dist.is_initialized()
@@ -250,7 +259,7 @@ def evaluate(cfg, weight_pth):
         )
 
     ## evaluator
-    heads, mious = eval_model(cfg, net)
+    heads, mious = eval_model(cfg, net.module)
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
 
