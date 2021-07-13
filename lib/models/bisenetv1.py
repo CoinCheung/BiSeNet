@@ -99,7 +99,7 @@ class AttentionRefinementModule(nn.Module):
         self.conv = ConvBNReLU(in_chan, out_chan, ks=3, stride=1, padding=1)
         self.conv_atten = nn.Conv2d(out_chan, out_chan, kernel_size= 1, bias=False)
         self.bn_atten = BatchNorm2d(out_chan)
-        self.sigmoid_atten = nn.Sigmoid()
+        #  self.sigmoid_atten = nn.Sigmoid()
         self.init_weight()
 
     def forward(self, x):
@@ -107,7 +107,8 @@ class AttentionRefinementModule(nn.Module):
         atten = torch.mean(feat, dim=(2, 3), keepdim=True)
         atten = self.conv_atten(atten)
         atten = self.bn_atten(atten)
-        atten = self.sigmoid_atten(atten)
+        #  atten = self.sigmoid_atten(atten)
+        atten = atten.sigmoid()
         out = torch.mul(feat, atten)
         return out
 
@@ -206,30 +207,39 @@ class FeatureFusionModule(nn.Module):
     def __init__(self, in_chan, out_chan, *args, **kwargs):
         super(FeatureFusionModule, self).__init__()
         self.convblk = ConvBNReLU(in_chan, out_chan, ks=1, stride=1, padding=0)
-        self.conv1 = nn.Conv2d(out_chan,
-                out_chan//4,
-                kernel_size = 1,
-                stride = 1,
-                padding = 0,
-                bias = False)
-        self.conv2 = nn.Conv2d(out_chan//4,
+        ## use conv-bn instead of 2 layer mlp, so that tensorrt 7.2.3.4 can work for fp16
+        self.conv = nn.Conv2d(out_chan,
                 out_chan,
                 kernel_size = 1,
                 stride = 1,
                 padding = 0,
                 bias = False)
-        self.relu = nn.ReLU(inplace=True)
-        self.sigmoid = nn.Sigmoid()
+        self.bn = nn.BatchNorm2d(out_chan)
+        #  self.conv1 = nn.Conv2d(out_chan,
+        #          out_chan//4,
+        #          kernel_size = 1,
+        #          stride = 1,
+        #          padding = 0,
+        #          bias = False)
+        #  self.conv2 = nn.Conv2d(out_chan//4,
+        #          out_chan,
+        #          kernel_size = 1,
+        #          stride = 1,
+        #          padding = 0,
+        #          bias = False)
+        #  self.relu = nn.ReLU(inplace=True)
         self.init_weight()
 
     def forward(self, fsp, fcp):
         fcat = torch.cat([fsp, fcp], dim=1)
         feat = self.convblk(fcat)
         atten = torch.mean(feat, dim=(2, 3), keepdim=True)
-        atten = self.conv1(atten)
-        atten = self.relu(atten)
-        atten = self.conv2(atten)
-        atten = self.sigmoid(atten)
+        atten = self.conv(atten)
+        atten = self.bn(atten)
+        #  atten = self.conv1(atten)
+        #  atten = self.relu(atten)
+        #  atten = self.conv2(atten)
+        atten = atten.sigmoid()
         feat_atten = torch.mul(feat, atten)
         feat_out = feat_atten + feat
         return feat_out
