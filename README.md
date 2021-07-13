@@ -6,13 +6,14 @@ My implementation of [BiSeNetV1](https://arxiv.org/abs/1808.00897) and [BiSeNetV
 mIOUs and fps on cityscapes val set:
 | none | ss | ssc | msf | mscf | fps(fp16/fp32) | link |
 |------|:--:|:---:|:---:|:----:|:---:|:----:|
-| bisenetv1 | 75.10 | 76.90 | 77.22 | 78.73 | 60/19 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_city.pth) |
-| bisenetv2 | 74.95 | 75.58 | 76.53 | 77.08 | 50/16 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_city.pth) |
+| bisenetv1 | 75.44 | 76.94 | 77.45 | 78.86 | 68/23 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_city_new.pth) |
+| bisenetv2 | 74.95 | 75.58 | 76.53 | 77.08 | 59/21 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_city.pth) |
+
 
 mIOUs on cocostuff val2017 set:
 | none | ss | ssc | msf | mscf | link |
 |------|:--:|:---:|:---:|:----:|:----:|
-| bisenetv1 | 31.89 | 31.62 | 32.81 | 32.72 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_coco.pth) |
+| bisenetv1 | 31.49 | 31.42 | 32.46 | 32.55 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_coco_new.pth) |
 | bisenetv2 | 30.49 | 30.55 | 31.81 | 31.73 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_coco.pth) |
 
 > Where **ss** means single scale evaluation, **ssc** means single scale crop evaluation, **msf** means multi-scale evaluation with flip augment, and **mscf** means multi-scale crop evaluation with flip evaluation. The eval scales and crop size of multi-scales evaluation can be found in [configs](./configs/).
