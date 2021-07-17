@@ -13,16 +13,16 @@ Though this demo runs on x86 platform, you can also use it on mobile platforms. 
 
 ### Install ncnn
 
-1.dependencies  
+1. dependencies  
 ```
 $ python -m pip install onnx-simplifier
 ```
 
-2.build ncnn  
+2. build ncnn  
 
 Just follow the ncnn official tutoral of [build-for-linux](https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux) to install ncnn:
 
-* dependencies  
+(1) dependencies  
 ```
 # apt install build-essential git libprotobuf-dev protobuf-compiler 
 ```
@@ -45,7 +45,7 @@ $ make install
 
 ### convert model, build and run the demo
 
-1.convert pytorch model to ncnn model via onnx  
+1. convert pytorch model to ncnn model via onnx  
 ```
 $ cd BiSeNet/
 $ python tools/export_onnx.py --aux-mode eval --config configs/bisenetv2_city.py --weight-path /path/to/your/model.pth --outpath ./model_v2.onnx 
@@ -56,7 +56,7 @@ $ mv model_v2_sim.param ncnn/models
 $ mv model_v2_sim.bin ncnn/models 
 ```
 
-2.compile demo code  
+2. compile demo code  
 ```
 mkdir -p ncnn/build
 cd ncnn/build
@@ -64,7 +64,7 @@ cmake .. -DNCNN_ROOT=/path/to/ncnn/build/install
 make
 ```
 
-3.run demo  
+3. run demo  
 ```
 ./segment
 ```
