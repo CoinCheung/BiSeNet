@@ -13,24 +13,24 @@ Though this demo runs on x86 platform, you can also use it on mobile platforms. 
 
 ### Install ncnn
 
-1. dependencies  
+#### dependencies  
   ```
   $ python -m pip install onnx-simplifier
   ```
 
-2. build ncnn  
+#### build ncnn  
 Just follow the ncnn official tutoral of [build-for-linux](https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux) to install ncnn:
 
-(1) dependencies  
-  ```
-  # apt install build-essential git libprotobuf-dev protobuf-compiler 
-  ```
+1. dependencies  
+```
+# apt install build-essential git libprotobuf-dev protobuf-compiler 
+```
 
-(2) (optional) install vulkan  
+2. (optional) install vulkan  
 
-* install opencv from source  
+3. install opencv from source  
 
-* build   
+4. build   
 I am using commit `9391fae741a1fb8d58cdfdc92878a5e9800f8567`, and I have not tested over newer commits.  
 ```
 $ git clone https://github.com/Tencent/ncnn.git
