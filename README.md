@@ -17,21 +17,21 @@ mIOUs on cocostuff val2017 set:
 | bisenetv2 | 30.49 | 30.55 | 31.81 | 31.73 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_coco.pth) |
 
 Tips: 
-1. Where **ss** means single scale evaluation, **ssc** means single scale crop evaluation, **msf** means multi-scale evaluation with flip augment, and **mscf** means multi-scale crop evaluation with flip evaluation. The eval scales and crop size of multi-scales evaluation can be found in [configs](./configs/).
+1. **ss** means single scale evaluation, **ssc** means single scale crop evaluation, **msf** means multi-scale evaluation with flip augment, and **mscf** means multi-scale crop evaluation with flip evaluation. The eval scales and crop size of multi-scales evaluation can be found in [configs](./configs/).
 
 2. The fps is tested in different way from the paper. For more information, please see [here](./tensorrt).
 
 3. For cocostuff dataset: The authors of the paper `bisenetv2` used the "old split" of 9k train set and 1k val set, while I used the "new split" of 118k train set and 5k val set. Thus the above results on cocostuff does not match the paper. The authors of bisenetv1 did not report their results on cocostuff, so here I simply provide a "make it work" result. Following the tradition of object detection, I used "1x"(90k) and "2x"(180k) schedule to train bisenetv1(1x) and bisenetv2(2x) respectively. Maybe you can have a better result by picking up hyper-parameters more carefully.
 
-4. the model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. 
+4. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. 
 
 
 ## deploy trained models
-1. tensorrt
-You can go to [tensorrt](./tensorrt) For details.
+1. tensorrt  
+You can go to [tensorrt](./tensorrt) for details.
 
-2. ncnn
-You can go to [ncnn](./ncnn) For details.
+2. ncnn  
+You can go to [ncnn](./ncnn) for details.
 
 
 ## platform
