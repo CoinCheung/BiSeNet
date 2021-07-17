@@ -116,3 +116,4 @@ datasets/coco/val.txt
 pretrained/*
 dist_train.sh
 
+tvm/

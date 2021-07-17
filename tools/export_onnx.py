@@ -18,14 +18,16 @@ parse.add_argument('--weight-path', dest='weight_pth', type=str,
         default='model_final.pth')
 parse.add_argument('--outpath', dest='out_pth', type=str,
         default='model.onnx')
+parse.add_argument('--aux-mode', dest='aux_mode', type=str,
+        default='pred')
 args = parse.parse_args()
 
 
 cfg = set_cfg_from_file(args.config)
 if cfg.use_sync_bn: cfg.use_sync_bn = False
 
-net = model_factory[cfg.model_type](cfg.n_cats, aux_mode='pred')
-net.load_state_dict(torch.load(args.weight_pth), strict=False)
+net = model_factory[cfg.model_type](cfg.n_cats, aux_mode=args.aux_mode)
+net.load_state_dict(torch.load(args.weight_pth, map_location='cpu'), strict=False)
 net.eval()
 
 

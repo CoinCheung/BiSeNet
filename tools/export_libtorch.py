@@ -25,7 +25,7 @@ cfg = set_cfg_from_file(args.config)
 if cfg.use_sync_bn: cfg.use_sync_bn = False
 
 net = model_factory[cfg.model_type](cfg.n_cats, aux_mode='pred')
-net.load_state_dict(torch.load(args.weight_pth), strict=False)
+net.load_state_dict(torch.load(args.weight_pth, map_location='cpu'), strict=False)
 net.eval()
 
 
