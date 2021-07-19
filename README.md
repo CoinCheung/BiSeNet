@@ -21,7 +21,7 @@ Tips:
 
 2. The fps is tested in different way from the paper. For more information, please see [here](./tensorrt).
 
-3. For cocostuff dataset: The authors of the paper `bisenetv2` used the "old split" of 9k train set and 1k val set, while I used the "new split" of 118k train set and 5k val set. Thus the above results on cocostuff does not match the paper. The authors of bisenetv1 did not report their results on cocostuff, so here I simply provide a "make it work" result. Following the tradition of object detection, I used "1x"(90k) and "2x"(180k) schedule to train bisenetv1(1x) and bisenetv2(2x) respectively. Maybe you can have a better result by picking up hyper-parameters more carefully.
+3. The authors of bisenetv2 used cocostuff-10k, while I used cocostuff-123k(do not know how to say, just same 118k train and 5k val images as object detection). Thus the results maybe different from paper. 
 
 4. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. 
 
