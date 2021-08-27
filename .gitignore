@@ -117,3 +117,4 @@ pretrained/*
 dist_train.sh
 
 tvm/
+.history
