@@ -9,7 +9,7 @@
 #include <inference_engine.hpp>
 
 
-std::string mdpth("../output_v1_sim/model_v1_city_sim.xml");
+std::string mdpth("../output_v2/model_v2.xml");
 std::string device("CPU"); // GNA does not support argmax, my cpu does not has integrated gpu
 std::string impth("../../example.png"); 
 std::string savepth("./res.jpg");
