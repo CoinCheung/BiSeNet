@@ -14,9 +14,9 @@ Though this demo runs on x86 platform, you can also use it on mobile platforms. 
 ### Install ncnn
 
 #### 1. dependencies  
-  ```
-  $ python -m pip install onnx-simplifier
-  ```
+```
+$ python -m pip install onnx-simplifier
+```
 
 #### 2. build ncnn  
 Just follow the ncnn official tutoral of [build-for-linux](https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux) to install ncnn:
