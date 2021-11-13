@@ -58,6 +58,7 @@ With a pretrained weight, you can run inference on an single image like this:
 $ python tools/demo.py --config configs/bisenetv2_city.py --weight-path /path/to/your/weights.pth --img-path ./example.png
 ```
 
+
 This would run inference on the image and save the result image to `./res.jpg`.  
 
 Or you can run inference on a video like this:  
@@ -65,6 +66,7 @@ Or you can run inference on a video like this:
 $ python tools/demo_video.py --config configs/bisenetv2_coco.py --weight-path res/model_final.pth --input ./video.mp4 --output res.mp4
 ```
 This would generate segmentation file as `res.mp4`. If you want to read from camera, you can set `--input camera_id` rather than `input ./video.mp4`.   
+
 
 
 ## prepare dataset
