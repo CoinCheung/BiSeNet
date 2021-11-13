@@ -53,8 +53,8 @@ def get_func(inpth, in_q):
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret: break
+        frame = frame[:, :, ::-1]
         frame = to_tensor(dict(im=frame, lb=None))['im'].unsqueeze(0)
-        frame = frame.flip(dims=(1,)) # rgb
         in_q.put(frame)
 
     in_q.put('quit')
