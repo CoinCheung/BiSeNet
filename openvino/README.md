@@ -57,6 +57,10 @@ If you want to use gpu, you also need to install some dependencies inside the co
 
 I got the above commands from the official docs but I did not test it since my cpu does not have integrated gpu.  
 
+You can check if your platform has intel gpu with this command:  
+```
+$ sudo lspci | grep -i vga
+```
 
 4.configure environment  
 just run this script, and the environment would be ready:  
@@ -87,6 +91,6 @@ After this, you will see a segmentation result image named `res.jpg` generated.
 
 ### Tipes
 
-1.GPU support: openvino supports intel cpu and intel "gpu inside cpu". Until now(2021.11), other popular isolated gpus are not supported, such as nvidia/amd gpus. Also, other integrated gpus are not supported, such as aspeed graphics family.
+1. GPU support: openvino supports intel cpu and intel "gpu inside cpu". Until now(2021.11), other popular isolated gpus are not supported, such as nvidia/amd gpus. Also, other integrated gpus are not supported, such as aspeed graphics family.
 
-2.About low-precision: precision is optimized automatically, and the model will be run in one or several precision mode. We can also manually enforce to use bf16, as long as our cpu have `avx512_bf16` supports. If cpu does not support bf16, it will use simulation which would slow down the inference. If neither native bf16 nor simulation is supported, an error would occur.
+2. About low-precision: precision is optimized automatically, and the model will be run in one or several precision mode. We can also manually enforce to use bf16, as long as our cpu have `avx512_bf16` supports. If cpu does not support bf16, it will use simulation which would slow down the inference. If neither native bf16 nor simulation is supported, an error would occur.
