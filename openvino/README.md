@@ -12,7 +12,7 @@ My cpu is Intel(R) Xeon(R) Gold 6240 CPU @ 2.60GHz.
 1.Train the model and export it to onnx  
 ```
 $ cd BiSeNet/
-$ python tools/export_onnx.py --aux-mode eval --config configs/bisenetv2_city.py --weight-path /path/to/your/model.pth --outpath ./model_v2.onnx 
+$ python tools/export_onnx.py --config configs/bisenetv2_city.py --weight-path /path/to/your/model.pth --outpath ./model_v2.onnx 
 ```
 (Optional) 2.Install 'onnx-simplifier' to simplify the generated onnx model:
 ```

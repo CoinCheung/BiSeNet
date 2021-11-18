@@ -5,10 +5,11 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.multiprocessing import Process, Queue
+import time
 from PIL import Image
 import numpy as np
 import cv2
-from torch.multiprocessing import Process, Queue
 
 import lib.transform_cv2 as T
 from lib.models import model_factory
@@ -60,6 +61,7 @@ def get_func(inpth, in_q):
     in_q.put('quit')
     while not in_q.empty(): continue
     cap.release()
+    time.sleep(1)
     print('input queue done')
 
 
