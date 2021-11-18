@@ -37,6 +37,9 @@ You can go to [ncnn](./ncnn) for details.
 3. openvino  
 You can go to [openvino](./openvino) for details.  
 
+4. tis
+Triton Inference Server(TIS) provides a service solution of deployment. You can go to [tis](./tis) for details.
+
 
 ## platform
 
