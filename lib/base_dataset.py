@@ -14,7 +14,8 @@ import numpy as np
 from lib.sampler import RepeatedDistSampler
 
 
-
+## annroot -> train.txt
+## dataroot -> path to dataset
 class BaseDataset(Dataset):
     '''
     '''
