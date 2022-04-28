@@ -249,17 +249,17 @@ def evaluate(cfg, weight_pth):
     net.load_state_dict(torch.load(weight_pth, map_location='cpu'))
     net.cuda()
 
-    is_dist = dist.is_initialized()
-    if is_dist:
-        local_rank = dist.get_rank()
-        net = nn.parallel.DistributedDataParallel(
-            net,
-            device_ids=[local_rank, ],
-            output_device=local_rank
-        )
+    #  is_dist = dist.is_initialized()
+    #  if is_dist:
+    #      local_rank = dist.get_rank()
+    #      net = nn.parallel.DistributedDataParallel(
+    #          net,
+    #          device_ids=[local_rank, ],
+    #          output_device=local_rank
+    #      )
 
     ## evaluator
-    heads, mious = eval_model(cfg, net.module)
+    heads, mious = eval_model(cfg, net)
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
 
@@ -284,7 +284,7 @@ def main():
         init_method='tcp://127.0.0.1:{}'.format(args.port),
         world_size=torch.cuda.device_count(),
         rank=args.local_rank
-    )
+        )
     if not osp.exists(cfg.respth): os.makedirs(cfg.respth)
     setup_logger('{}-eval'.format(cfg.model_type), cfg.respth)
     evaluate(cfg, args.weight_pth)
