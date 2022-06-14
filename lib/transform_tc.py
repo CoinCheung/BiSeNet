@@ -11,18 +11,6 @@ import torch
 import torch.nn.functional as F
 
 
-def resize(inp, size, mode):
-    '''
-        inp is HWC
-        size is (h, w)
-    '''
-    inp = inp.unsqueeze(0).permute(0, 3, 1, 2)
-    if mode == 'bilinear':
-        inp = F.interpolate(inp, mode=mode, align_corners=False)
-    elif mode == 'nearest':
-        inp = F.interpolate(inp, mode=mode)
-    return inp
-
 
 class RandomResizedCrop(object):
     '''
@@ -32,19 +20,27 @@ class RandomResizedCrop(object):
         self.scales = scales
         self.size = size
 
+    @torch.no_grad()
     def __call__(self, im_lb):
+        '''
+        im should be CHW
+        lb should be 1HW
+        '''
         if self.size is None:
             return im_lb
 
         im, lb = im_lb['im'], im_lb['lb']
-        assert im.shape[:2] == lb.shape[:2]
+        assert im.shape[-2:] == lb.shape[-2:]
+
+        im, lb = im.unsqueeze(0), lb.unsqueeze(0)
+        H, W = im.size()[2:]
 
         crop_h, crop_w = self.size
         scale = np.random.uniform(min(self.scales), max(self.scales))
-        im_h, im_w = [math.ceil(el * scale) for el in im.shape[:2]]
+        im_h, im_w = math.ceil(H * scale), math.ceil(W * scale)
 
-        im = resize(im, (im_h, im_w), mode='bilinear')
-        lb = resize(lb, (im_h, im_w), mode='nearest')
+        im = F.interpolate(im, (im_h, im_w), mode='bilinear', align_corners=False)
+        lb = F.interpolate(lb, (im_h, im_w), mode='nearest')
 
         if (im_h, im_w) == (crop_h, crop_w): return dict(im=im, lb=lb)
         pad_h, pad_w = 0, 0
@@ -53,16 +49,15 @@ class RandomResizedCrop(object):
         if im_w < crop_w:
             pad_w = (crop_w - im_w) // 2 + 1
         if pad_h > 0 or pad_w > 0:
-            im = np.pad(im, ((pad_h, pad_h), (pad_w, pad_w), (0, 0)))
-            lb = np.pad(lb, ((pad_h, pad_h), (pad_w, pad_w)), 'constant', constant_values=255)
+            im = F.pad(im, (pad_w, pad_w, pad_h, pad_h), (0, 0)))
+            lb = F.pad(lb, (pad_w, pad_w, pad_h, pad_h), mode='constant', value=255)
 
-        im_h, im_w, _ = im.shape
+        im_h, im_w = im.size()[-2:]
         sh, sw = np.random.random(2)
         sh, sw = int(sh * (im_h - crop_h)), int(sw * (im_w - crop_w))
-        return dict(
-            im=im[sh:sh+crop_h, sw:sw+crop_w, :].copy(),
-            lb=lb[sh:sh+crop_h, sw:sw+crop_w].copy()
-        )
+        im = im[0, :, sh:sh+crop_h, sw:sw+crop_w].clone()
+        lb = lb[0, :, sh:sh+crop_h, sw:sw+crop_w].clone()
+        return dict(im=im, lb=lb)
 
 
 
@@ -71,14 +66,15 @@ class RandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
 
+    @torch.no_grad()
     def __call__(self, im_lb):
         if np.random.random() < self.p:
             return im_lb
         im, lb = im_lb['im'], im_lb['lb']
-        assert im.shape[:2] == lb.shape[:2]
+        assert im.shape[-2:] == lb.shape[-2:]
         return dict(
-            im=im[:, ::-1, :],
-            lb=lb[:, ::-1],
+            im=im.flip(dims=-1),
+            lb=lb.flip(dims=-1),
         )
 
 
@@ -93,9 +89,10 @@ class ColorJitter(object):
         if not saturation is None and saturation >= 0:
             self.saturation = [max(1-saturation, 0), 1+saturation]
 
+    @torch.no_grad()
     def __call__(self, im_lb):
         im, lb = im_lb['im'], im_lb['lb']
-        assert im.shape[:2] == lb.shape[:2]
+        assert im.shape[-2:] == lb.shape[-2:]
         if not self.brightness is None:
             rate = np.random.uniform(*self.brightness)
             im = self.adj_brightness(im, rate)
@@ -108,49 +105,64 @@ class ColorJitter(object):
         return dict(im=im, lb=lb,)
 
     def adj_saturation(self, im, rate):
-        M = np.float32([
+        M = torch.tensor([
             [1+2*rate, 1-rate, 1-rate],
             [1-rate, 1+2*rate, 1-rate],
             [1-rate, 1-rate, 1+2*rate]
-        ])
-        shape = im.shape
-        im = np.matmul(im.reshape(-1, 3), M).reshape(shape)/3
-        im = np.clip(im, 0, 255).astype(np.uint8)
+        ], dtype=torch.float32)
+        im = torch.einsum('b...,bc->c...', im, M) / 3
+        im = im.clip(0, 255).to(torch.uint8)
         return im
 
     def adj_brightness(self, im, rate):
-        table = np.array([
-            i * rate for i in range(256)
-        ]).clip(0, 255).astype(np.uint8)
+        table = torch.arange(256) * rate
+        table = table.clip(0, 255).to(torch.uint8)
         return table[im]
 
     def adj_contrast(self, im, rate):
-        table = np.array([
-            74 + (i - 74) * rate for i in range(256)
-        ]).clip(0, 255).astype(np.uint8)
+        table = (torch.arange(256) - 74) * rate + 74
+        table = table.clip(0, 255).to(torch.uint8)
         return table[im]
 
 
+
+class Numpy2Tensor(object):
+    '''
+        input:
+            im should be HWC, type is np.array
+            lb should be HW, type is np.array
+        output:
+            im is CHW, type is torch.tensor
+            lb is 1HW, type is torch.tensor
+    '''
+    @torch.no_grad()
+    def __call__(self, im_lb):
+        im, lb = im_lb['im'], im_lb['lb']
+        im = torch.tensor(im).permute(2, 0, 1)
+        if not lb is None:
+            lb = torch.tensor(lb).unsqueeze(0)
+        return dict(im=im, lb=lb)
 
 
 class ToTensor(object):
     '''
-    mean and std should be of the channel order 'bgr'
+    mean and std should be of the channel order 'rgb'
     '''
     def __init__(self, mean=(0, 0, 0), std=(1., 1., 1.)):
-        self.mean = mean
-        self.std = std
+        self.mean = torch.tensor(mean, dtype=torch.float32)
+        self.std = torch.tensor(std, dtype=torch.float32)
+        self.mean = self.mean.view(-1, 1, 1)
+        self.std = self.std.view(-1, 1, 1)
 
+    @torch.no_grad()
     def __call__(self, im_lb):
         im, lb = im_lb['im'], im_lb['lb']
-        im = im.transpose(2, 0, 1).astype(np.float32)
-        im = torch.from_numpy(im).div_(255)
-        dtype, device = im.dtype, im.device
-        mean = torch.as_tensor(self.mean, dtype=dtype, device=device)[:, None, None]
-        std = torch.as_tensor(self.std, dtype=dtype, device=device)[:, None, None]
+        mean = self.mean.to(im.device)
+        std = self.std.to(im.device)
+        im = im.to(torch.float32).div_(255.)
         im = im.sub_(mean).div_(std).clone()
         if not lb is None:
-            lb = torch.from_numpy(lb.astype(np.int64).copy()).clone()
+            lb = lb.to(torch.int64)
         return dict(im=im, lb=lb)
 
 
@@ -159,11 +171,42 @@ class Compose(object):
     def __init__(self, do_list):
         self.do_list = do_list
 
+    @torch.no_grad()
     def __call__(self, im_lb):
         for comp in self.do_list:
             im_lb = comp(im_lb)
         return im_lb
 
+
+class TransformationTrain(object):
+
+    def __init__(self, scales, cropsize):
+        self.trans_func = Compose([
+            Numpy2Tensor(),
+            RandomResizedCrop(scales, cropsize),
+            RandomHorizontalFlip(),
+            ColorJitter(
+                brightness=0.4,
+                contrast=0.4,
+                saturation=0.4
+            ),
+        ])
+
+    @torch.no_grad()
+    def __call__(self, im_lb):
+        im_lb = self.trans_func(im_lb)
+        return im_lb
+
+
+class TransformationVal(object):
+
+    def __init__(self, scales, cropsize):
+        self.trans_func = Numpy2Tensor()
+
+    @torch.no_grad()
+    def __call__(self, im_lb):
+        im_lb = self.trans_func(im_lb)
+        return im_lb
 
 
 
