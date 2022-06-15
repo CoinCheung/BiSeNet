@@ -42,8 +42,6 @@ from lib.logger import setup_logger, print_log_msg
 
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument('--local_rank', dest='local_rank', type=int, default=-1,)
-    parse.add_argument('--port', dest='port', type=int, default=44554,)
     parse.add_argument('--config', dest='config', type=str,
             default='configs/bisenetv2.py',)
     parse.add_argument('--finetune-from', type=str, default=None,)
@@ -100,7 +98,7 @@ def set_optimizer(model):
 
 
 def set_model_dist(net):
-    local_rank = dist.get_rank()
+    local_rank = int(os.environ['LOCAL_RANK'])
     net = nn.parallel.DistributedDataParallel(
         net,
         device_ids=[local_rank, ],
@@ -194,13 +192,10 @@ def train():
 
 
 def main():
-    torch.cuda.set_device(args.local_rank)
-    dist.init_process_group(
-        backend='nccl',
-        init_method='tcp://127.0.0.1:{}'.format(args.port),
-        world_size=torch.cuda.device_count(),
-        rank=args.local_rank
-    )
+    local_rank = int(os.environ['LOCAL_RANK'])
+    torch.cuda.set_device(local_rank)
+    dist.init_process_group(backend='nccl')
+
     if not osp.exists(cfg.respth): os.makedirs(cfg.respth)
     setup_logger(f'{cfg.model_type}-{cfg.dataset.lower()}-train', cfg.respth)
     train()

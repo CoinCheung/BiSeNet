@@ -154,7 +154,7 @@ class Compose(object):
 class TransformationTrain(object):
 
     def __init__(self, scales, cropsize):
-        self.trans_func = T.Compose([
+        self.trans_func = Compose([
             RandomResizedCrop(scales, cropsize),
             RandomHorizontalFlip(),
             ColorJitter(

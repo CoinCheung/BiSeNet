@@ -3,8 +3,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.distributed as dist
 
-#  import lib.transform_cv2 as T
-import lib.transform_tc as T
+import lib.transform_cv2 as T
+#  import lib.transform_tc as T
 from lib.sampler import RepeatedDistSampler
 from lib.cityscapes_cv2 import CityScapes
 from lib.coco import CocoStuff
