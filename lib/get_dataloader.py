@@ -12,7 +12,7 @@ from lib.coco import CocoStuff
 
 
 
-def get_data_loader(cfg, mode='train', distributed=True):
+def get_data_loader(cfg, mode='train'):
     if mode == 'train':
         trans_func = T.TransformationTrain(cfg.scales, cfg.cropsize)
         batchsize = cfg.ims_per_gpu
@@ -28,7 +28,7 @@ def get_data_loader(cfg, mode='train', distributed=True):
 
     ds = eval(cfg.dataset)(cfg.im_root, annpath, trans_func=trans_func, mode=mode)
 
-    if distributed:
+    if dist.is_initialized():
         assert dist.is_available(), "dist should be initialzed"
         if mode == 'train':
             assert not cfg.max_iter is None

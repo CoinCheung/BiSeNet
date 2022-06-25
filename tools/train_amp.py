@@ -121,10 +121,9 @@ def set_meters():
 
 def train():
     logger = logging.getLogger()
-    is_dist = dist.is_initialized()
 
     ## dataset
-    dl = get_data_loader(cfg, mode='train', distributed=is_dist)
+    dl = get_data_loader(cfg, mode='train')
 
     ## model
     net, criteria_pre, criteria_aux = set_model(dl.dataset.lb_ignore)
