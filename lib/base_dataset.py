@@ -24,6 +24,7 @@ class BaseDataset(Dataset):
         self.mode = mode
         self.trans_func = trans_func
 
+        self.lb_ignore = -100
         self.lb_map = None
 
         with open(annpath, 'r') as fr:

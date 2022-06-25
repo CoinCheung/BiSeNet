@@ -52,7 +52,7 @@ cfg = set_cfg_from_file(args.config)
 
 
 
-def set_model():
+def set_model(lb_ignore=255):
     logger = logging.getLogger()
     net = model_factory[cfg.model_type](cfg.n_cats)
     if not args.finetune_from is None:
@@ -61,8 +61,9 @@ def set_model():
     if cfg.use_sync_bn: net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
     net.cuda()
     net.train()
-    criteria_pre = OhemCELoss(0.7)
-    criteria_aux = [OhemCELoss(0.7) for _ in range(cfg.num_aux_heads)]
+    criteria_pre = OhemCELoss(0.7, lb_ignore)
+    criteria_aux = [OhemCELoss(0.7, lb_ignore)
+            for _ in range(cfg.num_aux_heads)]
     return net, criteria_pre, criteria_aux
 
 
@@ -126,7 +127,7 @@ def train():
     dl = get_data_loader(cfg, mode='train', distributed=is_dist)
 
     ## model
-    net, criteria_pre, criteria_aux = set_model()
+    net, criteria_pre, criteria_aux = set_model(dl.dataset.lb_ignore)
 
     ## optimizer
     optim = set_optimizer(net)
