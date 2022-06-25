@@ -46,11 +46,11 @@ Triton Inference Server(TIS) provides a service solution of deployment. You can 
 My platform is like this: 
 
 * ubuntu 18.04
-* nvidia Tesla T4 gpu, driver 450.51.05
-* cuda 10.2
-* cudnn 7
+* nvidia Tesla T4 gpu, driver 450.80.02
+* cuda 10.2/11.3
+* cudnn 8
 * miniconda python 3.8.8
-* pytorch 1.8.1
+* pytorch 1.11.0
 
 
 ## get start
@@ -114,33 +114,7 @@ Then you need to change the field of `im_root` and `train/val_im_anns` in the co
 
 ## train
 
-I used the following command to train the models:
-
-```bash
-# bisenetv1 cityscapes
-export CUDA_VISIBLE_DEVICES=0,1
-cfg_file=configs/bisenetv1_city.py
-NGPUS=2
-python -m torch.distributed.launch --nproc_per_node=$NGPUS tools/train_amp.py --config $cfg_file 
-
-# bisenetv2 cityscapes
-export CUDA_VISIBLE_DEVICES=0,1
-cfg_file=configs/bisenetv2_city.py
-NGPUS=2
-python -m torch.distributed.launch --nproc_per_node=$NGPUS tools/train_amp.py --config $cfg_file 
-
-# bisenetv1 cocostuff
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-cfg_file=configs/bisenetv1_coco.py
-NGPUS=4
-python -m torch.distributed.launch --nproc_per_node=$NGPUS tools/train_amp.py --config $cfg_file 
-
-# bisenetv2 cocostuff
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-cfg_file=configs/bisenetv2_coco.py
-NGPUS=8
-python -m torch.distributed.launch --nproc_per_node=$NGPUS tools/train_amp.py --config $cfg_file 
-```
+Training commands I used to train the models can be found in [here](./dist_train.sh).
 
 Note:  
 1. though `bisenetv2` has fewer flops, it requires much more training iterations. The the training time of `bisenetv1` is shorter.

@@ -12,6 +12,10 @@ import lib.transform_cv2 as T
 from lib.models import model_factory
 from configs import set_cfg_from_file
 
+
+# uncomment the following line if you want to reduce cpu usage, see issue #231
+#  torch.set_num_threads(4)
+
 torch.set_grad_enabled(False)
 np.random.seed(123)
 

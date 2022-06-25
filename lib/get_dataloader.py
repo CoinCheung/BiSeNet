@@ -10,40 +10,17 @@ from lib.coco import CocoStuff
 
 
 
-class TransformationTrain(object):
-
-    def __init__(self, scales, cropsize):
-        self.trans_func = T.Compose([
-            T.RandomResizedCrop(scales, cropsize),
-            T.RandomHorizontalFlip(),
-            T.ColorJitter(
-                brightness=0.4,
-                contrast=0.4,
-                saturation=0.4
-            ),
-        ])
-
-    def __call__(self, im_lb):
-        im_lb = self.trans_func(im_lb)
-        return im_lb
 
 
-class TransformationVal(object):
-
-    def __call__(self, im_lb):
-        im, lb = im_lb['im'], im_lb['lb']
-        return dict(im=im, lb=lb)
-
-
-def get_data_loader(cfg, mode='train', distributed=True):
+def get_data_loader(cfg, mode='train'):
     if mode == 'train':
-        trans_func = TransformationTrain(cfg.scales, cfg.cropsize)
+        trans_func = T.TransformationTrain(cfg.scales, cfg.cropsize)
         batchsize = cfg.ims_per_gpu
         annpath = cfg.train_im_anns
         shuffle = True
         drop_last = True
     elif mode == 'val':
-        trans_func = TransformationVal()
+        trans_func = T.TransformationVal()
         batchsize = cfg.eval_ims_per_gpu
         annpath = cfg.val_im_anns
         shuffle = False
@@ -51,7 +28,7 @@ def get_data_loader(cfg, mode='train', distributed=True):
 
     ds = eval(cfg.dataset)(cfg.im_root, annpath, trans_func=trans_func, mode=mode)
 
-    if distributed:
+    if dist.is_initialized():
         assert dist.is_available(), "dist should be initialzed"
         if mode == 'train':
             assert not cfg.max_iter is None

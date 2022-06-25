@@ -19,6 +19,7 @@ def setup_logger(name, logpth):
     try:
         logging.basicConfig(level=log_level, format=FORMAT, filename=logfile, force=True)
     except Exception:
+        for hl in logging.root.handlers: logging.root.removeHandler(hl)
         logging.basicConfig(level=log_level, format=FORMAT, filename=logfile)
     logging.root.addHandler(logging.StreamHandler())
 

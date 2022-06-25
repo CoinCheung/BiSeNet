@@ -114,7 +114,7 @@ tensorrt/build/*
 datasets/coco/train.txt
 datasets/coco/val.txt
 pretrained/*
-dist_train.sh
+run.sh
 openvino/build/*
 openvino/output*
 *.onnx

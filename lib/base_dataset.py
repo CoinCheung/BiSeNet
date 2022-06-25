@@ -24,6 +24,7 @@ class BaseDataset(Dataset):
         self.mode = mode
         self.trans_func = trans_func
 
+        self.lb_ignore = -100
         self.lb_map = None
 
         with open(annpath, 'r') as fr:
@@ -50,7 +51,8 @@ class BaseDataset(Dataset):
         return img.detach(), label.unsqueeze(0).detach()
 
     def get_image(self, impth, lbpth):
-        img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
+        img = cv2.imread(impth)[:, :, ::-1].copy()
+        label = cv2.imread(lbpth, 0)
         return img, label
 
     def __len__(self):

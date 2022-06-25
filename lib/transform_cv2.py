@@ -151,6 +151,30 @@ class Compose(object):
         return im_lb
 
 
+class TransformationTrain(object):
+
+    def __init__(self, scales, cropsize):
+        self.trans_func = Compose([
+            RandomResizedCrop(scales, cropsize),
+            RandomHorizontalFlip(),
+            ColorJitter(
+                brightness=0.4,
+                contrast=0.4,
+                saturation=0.4
+            ),
+        ])
+
+    def __call__(self, im_lb):
+        im_lb = self.trans_func(im_lb)
+        return im_lb
+
+
+class TransformationVal(object):
+
+    def __call__(self, im_lb):
+        im, lb = im_lb['im'], im_lb['lb']
+        return dict(im=im, lb=lb)
+
 
 
 if __name__ == '__main__':

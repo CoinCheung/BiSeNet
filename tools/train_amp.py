@@ -42,8 +42,6 @@ from lib.logger import setup_logger, print_log_msg
 
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument('--local_rank', dest='local_rank', type=int, default=-1,)
-    parse.add_argument('--port', dest='port', type=int, default=44554,)
     parse.add_argument('--config', dest='config', type=str,
             default='configs/bisenetv2.py',)
     parse.add_argument('--finetune-from', type=str, default=None,)
@@ -54,7 +52,7 @@ cfg = set_cfg_from_file(args.config)
 
 
 
-def set_model():
+def set_model(lb_ignore=255):
     logger = logging.getLogger()
     net = model_factory[cfg.model_type](cfg.n_cats)
     if not args.finetune_from is None:
@@ -63,8 +61,9 @@ def set_model():
     if cfg.use_sync_bn: net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
     net.cuda()
     net.train()
-    criteria_pre = OhemCELoss(0.7)
-    criteria_aux = [OhemCELoss(0.7) for _ in range(cfg.num_aux_heads)]
+    criteria_pre = OhemCELoss(0.7, lb_ignore)
+    criteria_aux = [OhemCELoss(0.7, lb_ignore)
+            for _ in range(cfg.num_aux_heads)]
     return net, criteria_pre, criteria_aux
 
 
@@ -100,7 +99,7 @@ def set_optimizer(model):
 
 
 def set_model_dist(net):
-    local_rank = dist.get_rank()
+    local_rank = int(os.environ['LOCAL_RANK'])
     net = nn.parallel.DistributedDataParallel(
         net,
         device_ids=[local_rank, ],
@@ -122,13 +121,12 @@ def set_meters():
 
 def train():
     logger = logging.getLogger()
-    is_dist = dist.is_initialized()
 
     ## dataset
-    dl = get_data_loader(cfg, mode='train', distributed=is_dist)
+    dl = get_data_loader(cfg, mode='train')
 
     ## model
-    net, criteria_pre, criteria_aux = set_model()
+    net, criteria_pre, criteria_aux = set_model(dl.dataset.lb_ignore)
 
     ## optimizer
     optim = set_optimizer(net)
@@ -194,13 +192,10 @@ def train():
 
 
 def main():
-    torch.cuda.set_device(args.local_rank)
-    dist.init_process_group(
-        backend='nccl',
-        init_method='tcp://127.0.0.1:{}'.format(args.port),
-        world_size=torch.cuda.device_count(),
-        rank=args.local_rank
-    )
+    local_rank = int(os.environ['LOCAL_RANK'])
+    torch.cuda.set_device(local_rank)
+    dist.init_process_group(backend='nccl')
+
     if not osp.exists(cfg.respth): os.makedirs(cfg.respth)
     setup_logger(f'{cfg.model_type}-{cfg.dataset.lower()}-train', cfg.respth)
     train()
