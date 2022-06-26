@@ -20,7 +20,7 @@ import torch.cuda.amp as amp
 
 from lib.models import model_factory
 from configs import set_cfg_from_file
-from lib.get_dataloader import get_data_loader
+from lib.data import get_data_loader
 from evaluate import eval_model
 from lib.ohem_ce_loss import OhemCELoss
 from lib.lr_scheduler import WarmupPolyLrScheduler
