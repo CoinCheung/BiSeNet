@@ -113,6 +113,7 @@ I recommand you to check the information of your dataset with the script:
 ```
 $ python tools/check_dataset_info.py --im_root /path/to/your/data_root --im_anns /path/to/your/anno_file
 ```
+This will print some of the information of your dataset.  
 Then you need to change the field of `im_root` and `train/val_im_anns` in the config file. I prepared a demo config file for you named [`bisenet_customer.py`](./configs/bisenet_customer.py). You can start from this conig file.
 
 
