@@ -29,12 +29,36 @@ def get_round_size(size, divisor=32):
     return [math.ceil(el / divisor) * divisor for el in size]
 
 
+class SizePreprocessor(object):
+
+    def __init__(self, shape=None, shortside=None):
+        self.shape = shape
+        self.shortside = shortside
+
+    def __call__(self, imgs):
+        new_size = None
+        if not self.shape is None:
+            new_size = self.shape
+        elif not self.shortside is None:
+            h, w = imgs.size()[2:]
+            ss = self.shortside
+            if h < w: h, w = ss, int(ss / h * w)
+            else: h, w = int(ss / w * h), ss
+            new_size = h, w
+
+        if not new_size is None:
+            imgs = F.interpolate(imgs, size=new_size,
+                    mode='bilinear', align_corners=False)
+        return imgs
+
+
 class MscEvalV0(object):
 
-    def __init__(self, scales=(0.5, ), flip=False, ignore_label=255):
+    def __init__(self, scales=(0.5, ), flip=False, lb_ignore=255, size_processor=None):
         self.scales = scales
         self.flip = flip
-        self.ignore_label = ignore_label
+        self.ignore_label = lb_ignore
+        self.sp = size_processor
 
     def __call__(self, net, dl, n_classes):
         ## evaluate
@@ -44,11 +68,13 @@ class MscEvalV0(object):
         else:
             diter = enumerate(tqdm(dl))
         for i, (imgs, label) in diter:
-            N, _, H, W = label.shape
+            imgs = self.sp(imgs)
+            N, _, H, W = imgs.shape
             label = label.squeeze(1).cuda()
             size = label.size()[-2:]
             probs = torch.zeros(
-                    (N, n_classes, H, W), dtype=torch.float32).cuda().detach()
+                    (N, n_classes, *size),
+                    dtype=torch.float32).cuda().detach()
             for scale in self.scales:
                 sH, sW = int(scale * H), int(scale * W)
                 sH, sW = get_round_size((sH, sW))
@@ -90,11 +116,12 @@ class MscEvalCrop(object):
         flip=True,
         scales=[0.5, 0.75, 1, 1.25, 1.5, 1.75],
         lb_ignore=255,
+        size_processor=None
     ):
         self.scales = scales
         self.ignore_label = lb_ignore
         self.flip = flip
-        self.distributed = dist.is_initialized()
+        self.sp = size_processor
 
         self.cropsize = cropsize if isinstance(cropsize, (list, tuple)) else (cropsize, cropsize)
         self.cropstride = cropstride
@@ -147,30 +174,35 @@ class MscEvalCrop(object):
         return prob
 
 
-    def scale_crop_eval(self, net, im, scale, n_classes):
+    def scale_crop_eval(self, net, im, scale, size, n_classes):
         N, C, H, W = im.size()
         new_hw = [int(H * scale), int(W * scale)]
         im = F.interpolate(im, new_hw, mode='bilinear', align_corners=True)
         prob = self.crop_eval(net, im, n_classes)
-        prob = F.interpolate(prob, (H, W), mode='bilinear', align_corners=True)
+        prob = F.interpolate(prob, size, mode='bilinear', align_corners=True)
         return prob
 
 
     @torch.no_grad()
     def __call__(self, net, dl, n_classes):
-        dloader = dl if self.distributed and not dist.get_rank() == 0 else tqdm(dl)
 
         hist = torch.zeros(n_classes, n_classes).cuda().detach()
         hist.requires_grad_(False)
-        for i, (imgs, label) in enumerate(dloader):
-            imgs = imgs.cuda()
-            label = label.squeeze(1).cuda()
-            N, H, W = label.shape
+        if dist.is_initialized() and dist.get_rank() != 0:
+            diter = enumerate(dl)
+        else:
+            diter = enumerate(tqdm(dl))
 
-            probs = torch.zeros((N, n_classes, H, W)).cuda()
+        for i, (imgs, label) in diter:
+            imgs = imgs.cuda()
+            imgs = self.sp(imgs)
+            label = label.squeeze(1).cuda()
+            N, *size = label.size()
+
+            probs = torch.zeros((N, n_classes, *size)).cuda()
             probs.requires_grad_(False)
             for sc in self.scales:
-                probs += self.scale_crop_eval(net, imgs, sc, n_classes)
+                probs += self.scale_crop_eval(net, imgs, sc, size, n_classes)
             torch.cuda.empty_cache()
             preds = torch.argmax(probs, dim=1)
 
@@ -180,7 +212,7 @@ class MscEvalCrop(object):
                 minlength=n_classes ** 2
                 ).view(n_classes, n_classes)
 
-        if self.distributed:
+        if dist.is_initialized():
             dist.all_reduce(hist, dist.ReduceOp.SUM)
         ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
         miou = np.nanmean(ious.detach().cpu().numpy())
@@ -192,15 +224,25 @@ class MscEvalCrop(object):
 def eval_model(cfg, net):
     org_aux = net.aux_mode
     net.aux_mode = 'eval'
+    net.eval()
 
     is_dist = dist.is_initialized()
-    dl = get_data_loader(cfg, mode='val', distributed=is_dist)
-    net.eval()
+    dl = get_data_loader(cfg, mode='val')
+    lb_ignore = dl.dataset.lb_ignore
 
     heads, mious = [], []
     logger = logging.getLogger()
 
-    single_scale = MscEvalV0((1., ), False)
+    size_processor = SizePreprocessor(
+            cfg.get('eval_start_shape'),
+            cfg.get('eval_start_shortside'))
+
+    single_scale = MscEvalV0(
+            scales=(1., ),
+            flip=False,
+            lb_ignore=lb_ignore,
+            size_processor=size_processor
+    )
     mIOU = single_scale(net, dl, cfg.n_cats)
     heads.append('single_scale')
     mious.append(mIOU)
@@ -211,14 +253,20 @@ def eval_model(cfg, net):
         cropstride=2. / 3,
         flip=False,
         scales=(1., ),
-        lb_ignore=255,
+        lb_ignore=lb_ignore,
+        size_processor=size_processor
     )
     mIOU = single_crop(net, dl, cfg.n_cats)
     heads.append('single_scale_crop')
     mious.append(mIOU)
     logger.info('single scale crop mIOU is: %s\n', mIOU)
 
-    ms_flip = MscEvalV0(cfg.eval_scales, True)
+    ms_flip = MscEvalV0(
+            scales=cfg.eval_scales,
+            flip=True,
+            lb_ignore=lb_ignore,
+            size_processor=size_processor
+    )
     mIOU = ms_flip(net, dl, cfg.n_cats)
     heads.append('ms_flip')
     mious.append(mIOU)
@@ -229,7 +277,8 @@ def eval_model(cfg, net):
         cropstride=2. / 3,
         flip=True,
         scales=cfg.eval_scales,
-        lb_ignore=255,
+        lb_ignore=lb_ignore,
+        size_processor=size_processor
     )
     mIOU = ms_flip_crop(net, dl, cfg.n_cats)
     heads.append('ms_flip_crop')
@@ -265,11 +314,8 @@ def evaluate(cfg, weight_pth):
 
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument('--local_rank', dest='local_rank',
-                       type=int, default=-1,)
     parse.add_argument('--weight-path', dest='weight_pth', type=str,
                        default='model_final.pth',)
-    parse.add_argument('--port', dest='port', type=int, default=44553,)
     parse.add_argument('--config', dest='config', type=str,
             default='configs/bisenetv2.py',)
     return parse.parse_args()
@@ -278,13 +324,10 @@ def parse_args():
 def main():
     args = parse_args()
     cfg = set_cfg_from_file(args.config)
-    if not args.local_rank == -1:
-        torch.cuda.set_device(args.local_rank)
-        dist.init_process_group(backend='nccl',
-        init_method='tcp://127.0.0.1:{}'.format(args.port),
-        world_size=torch.cuda.device_count(),
-        rank=args.local_rank
-        )
+    if 'LOCAL_RANK' in os.environ:
+        local_rank = int(os.environ['LOCAL_RANK'])
+        torch.cuda.set_device(local_rank)
+        dist.init_process_group(backend='nccl')
     if not osp.exists(cfg.respth): os.makedirs(cfg.respth)
     setup_logger('{}-eval'.format(cfg.model_type), cfg.respth)
     evaluate(cfg, args.weight_pth)

@@ -13,6 +13,7 @@ cfg = dict(
     val_im_anns='./datasets/coco/val.txt',
     scales=[0.5, 2.],
     cropsize=[512, 512],
+    eval_start_shortside=512,
     eval_crop=[512, 512],
     eval_scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75],
     ims_per_gpu=4,
