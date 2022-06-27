@@ -22,7 +22,7 @@ import torch.distributed as dist
 from lib.models import model_factory
 from configs import set_cfg_from_file
 from lib.logger import setup_logger
-from lib.get_dataloader import get_data_loader
+from lib.data import get_data_loader
 
 
 def get_round_size(size, divisor=32):

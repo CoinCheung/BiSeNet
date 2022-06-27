@@ -109,7 +109,14 @@ frankfurt_000001_079206_leftImg8bit.png,frankfurt_000001_079206_gtFine_labelIds.
 ...
 ```
 Each line is a pair of training sample and ground truth image path, which are separated by a single comma `,`.   
-Then you need to change the field of `im_root` and `train/val_im_anns` in the configuration files. If you found what shows in `cityscapes_cv2.py` is not clear, you can also see `coco.py`.
+
+I recommand you to check the information of your dataset with the script:  
+```
+$ python tools/check_dataset_info.py --im_root /path/to/your/data_root --im_anns /path/to/your/anno_file
+```
+This will print some of the information of your dataset.  
+
+Then you need to change the field of `im_root` and `train/val_im_anns` in the config file. I prepared a demo config file for you named [`bisenet_customer.py`](./configs/bisenet_customer.py). You can start from this conig file.
 
 
 ## train

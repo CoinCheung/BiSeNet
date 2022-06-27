@@ -11,7 +11,6 @@ import torch.distributed as dist
 import cv2
 import numpy as np
 
-from lib.sampler import RepeatedDistSampler
 
 
 

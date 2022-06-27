@@ -3,10 +3,12 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.distributed as dist
 
-import lib.transform_cv2 as T
-from lib.sampler import RepeatedDistSampler
-from lib.cityscapes_cv2 import CityScapes
-from lib.coco import CocoStuff
+import lib.data.transform_cv2 as T
+from lib.data.sampler import RepeatedDistSampler
+
+from lib.data.cityscapes_cv2 import CityScapes
+from lib.data.coco import CocoStuff
+from lib.data.customer_dataset import CustomerDataset
 
 
 

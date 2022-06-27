@@ -11,9 +11,8 @@ import torch.distributed as dist
 import cv2
 import numpy as np
 
-import lib.transform_cv2 as T
-from lib.sampler import RepeatedDistSampler
-from lib.base_dataset import BaseDataset
+import lib.data.transform_cv2 as T
+from lib.data.base_dataset import BaseDataset
 
 '''
 91(thing) + 91(stuff) = 182 classes, label proportions are:
@@ -51,6 +50,7 @@ class CocoStuff(BaseDataset):
         super(CocoStuff, self).__init__(
                 dataroot, annpath, trans_func, mode)
         self.n_cats = 171 # 91 stuff, 91 thing, 11 of thing have no annos
+        self.lb_ignore = 255
 
         ## label mapping, remove non-existing labels
         missing = [11, 25, 28, 29, 44, 65, 67, 68, 70, 82, 90]

@@ -11,8 +11,8 @@ import torch.distributed as dist
 import cv2
 import numpy as np
 
-import lib.transform_cv2 as T
-from lib.base_dataset import BaseDataset
+import lib.data.transform_cv2 as T
+from lib.data.base_dataset import BaseDataset
 
 
 labels_info = [
