@@ -7,6 +7,7 @@ class cfg_dict(object):
 
     def __init__(self, d):
         self.__dict__ = d
+        self.get = d.get
 
 
 def set_cfg_from_file(cfg_path):
