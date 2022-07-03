@@ -52,16 +52,82 @@ class SizePreprocessor(object):
         return imgs
 
 
+
+class Metrics(object):
+
+    def __init__(self, n_classes, lb_ignore=255):
+        self.n_classes = n_classes
+        self.lb_ignore = lb_ignore
+        self.confusion = torch.zeros((n_classes, n_classes)).cuda().detach()
+
+    @torch.no_grad()
+    def update(self, preds, label):
+        keep = label != self.lb_ignore
+        preds, label = preds[keep], label[keep]
+        self.confusion += torch.bincount(
+                label * self.n_classes + preds,
+                minlength=self.n_classes ** 2
+                ).view(self.n_classes, self.n_classes)
+
+    @torch.no_grad()
+    def compute_metrics(self,):
+        if dist.is_initialized():
+            dist.all_reduce(self.confusion, dist.ReduceOp.SUM)
+
+        confusion = self.confusion
+        weights = confusion.sum(dim=1) / confusion.sum()
+        tps = confusion.diag()
+        fps = confusion.sum(dim=0) - tps
+        fns = confusion.sum(dim=1) - tps
+
+        # iou and fw miou
+        ious = confusion.diag() / (confusion.sum(dim=0) + confusion.sum(dim=1) - confusion.diag() + 1)
+        miou = ious.nanmean()
+        fw_miou = torch.sum(weights * ious)
+
+        eps = 1e-6
+        # macro f1 score
+        macro_precision = tps / (tps + fps + 1)
+        macro_recall = tps / (tps + fns + 1)
+        f1_scores = (2 * macro_precision * macro_recall) / (
+                macro_precision + macro_recall + eps)
+        macro_f1 = f1_scores.nanmean(dim=0)
+
+        # micro f1 score
+        tps_ = tps.sum(dim=0)
+        fps_ = fps.sum(dim=0)
+        fns_ = fns.sum(dim=0)
+        micro_precision = tps_ / (tps_ + fps_ + 1)
+        micro_recall = tps_ / (tps_ + fns_ + 1)
+        micro_f1 = (2 * micro_precision * micro_recall) / (
+                micro_precision + micro_recall + eps)
+
+        metric_dict = dict(
+                weights=weights.tolist(),
+                ious=ious.tolist(),
+                miou=miou.item(),
+                fw_miou=fw_miou.item(),
+                f1_scores=f1_scores.tolist(),
+                macro_f1=macro_f1.item(),
+                micro_f1=micro_f1.item(),
+                )
+        return metric_dict
+
+
+
 class MscEvalV0(object):
 
-    def __init__(self, scales=(0.5, ), flip=False, lb_ignore=255, size_processor=None):
+    def __init__(self, n_classes, scales=(0.5, ), flip=False, lb_ignore=255, size_processor=None):
+        self.n_classes = n_classes
         self.scales = scales
         self.flip = flip
         self.ignore_label = lb_ignore
         self.sp = size_processor
+        self.metric_observer = Metrics(n_classes, lb_ignore)
 
-    def __call__(self, net, dl, n_classes):
+    def __call__(self, net, dl):
         ## evaluate
+        n_classes = self.n_classes
         hist = torch.zeros(n_classes, n_classes).cuda().detach()
         if dist.is_initialized() and dist.get_rank() != 0:
             diter = enumerate(dl)
@@ -94,16 +160,10 @@ class MscEvalV0(object):
                             mode='bilinear', align_corners=True)
                     probs += torch.softmax(logits, dim=1)
             preds = torch.argmax(probs, dim=1)
-            keep = label != self.ignore_label
-            hist += torch.bincount(
-                label[keep] * n_classes + preds[keep],
-                minlength=n_classes ** 2
-                ).view(n_classes, n_classes)
-        if dist.is_initialized():
-            dist.all_reduce(hist, dist.ReduceOp.SUM)
-        ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
-        miou = np.nanmean(ious.detach().cpu().numpy())
-        return miou.item()
+            self.metric_observer.update(preds, label)
+
+        metric_dict = self.metric_observer.compute_metrics()
+        return metric_dict
 
 
 
@@ -111,6 +171,7 @@ class MscEvalCrop(object):
 
     def __init__(
         self,
+        n_classes,
         cropsize=1024,
         cropstride=2./3,
         flip=True,
@@ -118,10 +179,12 @@ class MscEvalCrop(object):
         lb_ignore=255,
         size_processor=None
     ):
+        self.n_classes = n_classes
         self.scales = scales
         self.ignore_label = lb_ignore
         self.flip = flip
         self.sp = size_processor
+        self.metric_observer = Metrics(n_classes, lb_ignore)
 
         self.cropsize = cropsize if isinstance(cropsize, (list, tuple)) else (cropsize, cropsize)
         self.cropstride = cropstride
@@ -184,8 +247,9 @@ class MscEvalCrop(object):
 
 
     @torch.no_grad()
-    def __call__(self, net, dl, n_classes):
+    def __call__(self, net, dl):
 
+        n_classes = self.n_classes
         hist = torch.zeros(n_classes, n_classes).cuda().detach()
         hist.requires_grad_(False)
         if dist.is_initialized() and dist.get_rank() != 0:
@@ -205,19 +269,24 @@ class MscEvalCrop(object):
                 probs += self.scale_crop_eval(net, imgs, sc, size, n_classes)
             torch.cuda.empty_cache()
             preds = torch.argmax(probs, dim=1)
+            self.metric_observer.update(preds, label)
 
-            keep = label != self.ignore_label
-            hist += torch.bincount(
-                label[keep] * n_classes + preds[keep],
-                minlength=n_classes ** 2
-                ).view(n_classes, n_classes)
+        metric_dict = self.metric_observer.compute_metrics()
+        return metric_dict
 
-        if dist.is_initialized():
-            dist.all_reduce(hist, dist.ReduceOp.SUM)
-        ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
-        miou = np.nanmean(ious.detach().cpu().numpy())
-        return miou.item()
 
+def print_res_table(tname, heads, weights, metric, cat_metric):
+    heads = [tname, 'ratio'] + heads
+    lines = []
+    for k, v in metric.items():
+        line = [k, '-'] + [f'{el:.6f}' for el in v]
+        lines.append(line)
+    cat_res = [weights,] + cat_metric
+    cat_res = [
+            [f'cat {idx}',] + [f'{el:.6f}' for el in group]
+            for idx,group in enumerate(zip(*cat_res))]
+    content = cat_res + lines
+    return heads, content
 
 
 @torch.no_grad()
@@ -230,7 +299,8 @@ def eval_model(cfg, net):
     dl = get_data_loader(cfg, mode='val')
     lb_ignore = dl.dataset.lb_ignore
 
-    heads, mious = [], []
+    heads, mious, fw_mious, cat_ious = [], [], [], []
+    f1_scores, macro_f1, micro_f1 = [], [], []
     logger = logging.getLogger()
 
     size_processor = SizePreprocessor(
@@ -238,55 +308,88 @@ def eval_model(cfg, net):
             cfg.get('eval_start_shortside'))
 
     single_scale = MscEvalV0(
+            n_classes=cfg.n_cats,
             scales=(1., ),
             flip=False,
             lb_ignore=lb_ignore,
             size_processor=size_processor
     )
-    mIOU = single_scale(net, dl, cfg.n_cats)
-    heads.append('single_scale')
-    mious.append(mIOU)
-    logger.info('single mIOU is: %s\n', mIOU)
+    logger.info('compute single scale metrics')
+    metrics = single_scale(net, dl)
+    heads.append('ss')
+    mious.append(metrics['miou'])
+    fw_mious.append(metrics['fw_miou'])
+    cat_ious.append(metrics['ious'])
+    f1_scores.append(metrics['f1_scores'])
+    macro_f1.append(metrics['macro_f1'])
+    micro_f1.append(metrics['micro_f1'])
 
     single_crop = MscEvalCrop(
-        cropsize=cfg.eval_crop,
-        cropstride=2. / 3,
-        flip=False,
-        scales=(1., ),
-        lb_ignore=lb_ignore,
-        size_processor=size_processor
+            n_classes=cfg.n_cats,
+            cropsize=cfg.eval_crop,
+            cropstride=2. / 3,
+            flip=False,
+            scales=(1., ),
+            lb_ignore=lb_ignore,
+            size_processor=size_processor
     )
-    mIOU = single_crop(net, dl, cfg.n_cats)
-    heads.append('single_scale_crop')
-    mious.append(mIOU)
-    logger.info('single scale crop mIOU is: %s\n', mIOU)
+    logger.info('compute single scale crop metrics')
+    metrics = single_crop(net, dl)
+    heads.append('ssc')
+    mious.append(metrics['miou'])
+    fw_mious.append(metrics['fw_miou'])
+    cat_ious.append(metrics['ious'])
+    f1_scores.append(metrics['f1_scores'])
+    macro_f1.append(metrics['macro_f1'])
+    micro_f1.append(metrics['micro_f1'])
 
     ms_flip = MscEvalV0(
+            n_classes=cfg.n_cats,
             scales=cfg.eval_scales,
             flip=True,
             lb_ignore=lb_ignore,
             size_processor=size_processor
     )
-    mIOU = ms_flip(net, dl, cfg.n_cats)
-    heads.append('ms_flip')
-    mious.append(mIOU)
-    logger.info('ms flip mIOU is: %s\n', mIOU)
+    logger.info('compute multi scale flip metrics')
+    metrics = ms_flip(net, dl)
+    heads.append('msf')
+    mious.append(metrics['miou'])
+    fw_mious.append(metrics['fw_miou'])
+    cat_ious.append(metrics['ious'])
+    f1_scores.append(metrics['f1_scores'])
+    macro_f1.append(metrics['macro_f1'])
+    micro_f1.append(metrics['micro_f1'])
 
     ms_flip_crop = MscEvalCrop(
-        cropsize=cfg.eval_crop,
-        cropstride=2. / 3,
-        flip=True,
-        scales=cfg.eval_scales,
-        lb_ignore=lb_ignore,
-        size_processor=size_processor
+            n_classes=cfg.n_cats,
+            cropsize=cfg.eval_crop,
+            cropstride=2. / 3,
+            flip=True,
+            scales=cfg.eval_scales,
+            lb_ignore=lb_ignore,
+            size_processor=size_processor
     )
-    mIOU = ms_flip_crop(net, dl, cfg.n_cats)
-    heads.append('ms_flip_crop')
-    mious.append(mIOU)
-    logger.info('ms crop mIOU is: %s\n', mIOU)
+    logger.info('compute multi scale flip crop metrics')
+    metrics = ms_flip_crop(net, dl)
+    heads.append('msfc')
+    mious.append(metrics['miou'])
+    fw_mious.append(metrics['fw_miou'])
+    cat_ious.append(metrics['ious'])
+    f1_scores.append(metrics['f1_scores'])
+    macro_f1.append(metrics['macro_f1'])
+    micro_f1.append(metrics['micro_f1'])
+
+    weights = metrics['weights']
+
+    metric = dict(mious=mious, fw_mious=fw_mious)
+    iou_heads, iou_content = print_res_table('iou', heads,
+            weights, metric, cat_ious)
+    metric = dict(macro_f1=macro_f1, micro_f1=micro_f1)
+    f1_heads, f1_content = print_res_table('f1 score', heads,
+            weights, metric, f1_scores)
 
     net.aux_mode = org_aux
-    return heads, mious
+    return iou_heads, iou_content, f1_heads, f1_content
 
 
 def evaluate(cfg, weight_pth):
@@ -298,8 +401,7 @@ def evaluate(cfg, weight_pth):
     net.load_state_dict(torch.load(weight_pth, map_location='cpu'))
     net.cuda()
 
-    #  is_dist = dist.is_initialized()
-    #  if is_dist:
+    #  if dist.is_initialized():
     #      local_rank = dist.get_rank()
     #      net = nn.parallel.DistributedDataParallel(
     #          net,
@@ -308,8 +410,9 @@ def evaluate(cfg, weight_pth):
     #      )
 
     ## evaluator
-    heads, mious = eval_model(cfg, net)
-    logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
+    iou_heads, iou_content, f1_heads, f1_content = eval_model(cfg, net)
+    logger.info('\n' + tabulate(f1_content, headers=f1_heads, tablefmt='orgtbl'))
+    logger.info('\n' + tabulate(iou_content, headers=iou_heads, tablefmt='orgtbl'))
 
 
 def parse_args():
@@ -335,3 +438,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+     # 0.70646 |            0.719953 |  0.715522 |       0.712184
+     # 0.70646  | 0.719953 | 0.715522 | 0.712184
