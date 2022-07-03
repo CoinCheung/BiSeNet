@@ -133,7 +133,7 @@ Note:
 You can also load the trained model weights and finetune from it, like this:
 ```
 $ export CUDA_VISIBLE_DEVICES=0,1
-$ python -m torch.distributed.launch --nproc_per_node=2 tools/train_amp.py --finetune-from ./res/model_final.pth --config ./configs/bisenetv2_city.py # or bisenetv1
+$ torchrun --nproc_per_node=2 tools/train_amp.py --finetune-from ./res/model_final.pth --config ./configs/bisenetv2_city.py # or bisenetv1
 ```
 
 
@@ -141,6 +141,10 @@ $ python -m torch.distributed.launch --nproc_per_node=2 tools/train_amp.py --fin
 You can also evaluate a trained model like this: 
 ```
 $ python tools/evaluate.py --config configs/bisenetv1_city.py --weight-path /path/to/your/weight.pth
+```
+or you can use multi gpus:  
+```
+$ torchrun --nproc_per_node=2 tools/evaluate.py --config configs/bisenetv1_city.py --weight-path /path/to/your/weight.pth
 ```
 
 
