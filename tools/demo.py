@@ -10,7 +10,7 @@ from PIL import Image
 import numpy as np
 import cv2
 
-import lib.transform_cv2 as T
+import lib.data.transform_cv2 as T
 from lib.models import model_factory
 from configs import set_cfg_from_file
 
@@ -34,7 +34,7 @@ cfg = set_cfg_from_file(args.config)
 palette = np.random.randint(0, 256, (256, 3), dtype=np.uint8)
 
 # define model
-net = model_factory[cfg.model_type](cfg.n_cats, aux_mode='pred')
+net = model_factory[cfg.model_type](cfg.n_cats, aux_mode='eval')
 net.load_state_dict(torch.load(args.weight_path, map_location='cpu'), strict=False)
 net.eval()
 net.cuda()
@@ -53,8 +53,9 @@ new_size = [math.ceil(el / 32) * 32 for el in im.size()[2:]]
 
 # inference
 im = F.interpolate(im, size=new_size, align_corners=False, mode='bilinear')
-out = net(im)
+out = net(im)[0]
 out = F.interpolate(out, size=org_size, align_corners=False, mode='bilinear')
+out = out.argmax(dim=1)
 
 # visualize
 out = out.squeeze().detach().cpu().numpy()
