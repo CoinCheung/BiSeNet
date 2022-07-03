@@ -2,8 +2,10 @@
 import sys
 sys.path.insert(0, '.')
 import argparse
+import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from PIL import Image
 import numpy as np
 import cv2
@@ -45,7 +47,16 @@ to_tensor = T.ToTensor(
 im = cv2.imread(args.img_path)[:, :, ::-1]
 im = to_tensor(dict(im=im, lb=None))['im'].unsqueeze(0).cuda()
 
+# shape divisor
+org_size = im.size()[2:]
+new_size = [math.ceil(el / 32) * 32 for el in im.size()[2:]]
+
 # inference
-out = net(im).squeeze().detach().cpu().numpy()
+im = F.interpolate(im, size=new_size, align_corners=False, mode='bilinear')
+out = net(im)
+out = F.interpolate(out, size=org_size, align_corners=False, mode='bilinear')
+
+# visualize
+out = out.squeeze().detach().cpu().numpy()
 pred = palette[out]
 cv2.imwrite('./res.jpg', pred)
