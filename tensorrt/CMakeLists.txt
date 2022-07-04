@@ -6,7 +6,8 @@ set(CMAKE_CXX_FLAGS "-std=c++14 -O1")
 
 
 link_directories(/usr/local/cuda/lib64)
-# set(OpenCV_DIR "/opt/opencv/lib/cmake/opencv4")
+# include_directories(/root/build/TensorRT-8.2.5.1/include)
+# link_directories(/root/build/TensorRT-8.2.5.1/lib)
 
 
 find_package(CUDA REQUIRED)
