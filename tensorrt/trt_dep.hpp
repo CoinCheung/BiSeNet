@@ -5,7 +5,6 @@
 #include "NvOnnxParser.h"
 #include "NvInferPlugin.h"
 #include <cuda_runtime_api.h>
-#include "NvInferRuntimeCommon.h"
 
 #include <iostream>
 #include <string>
@@ -25,7 +24,7 @@ using Severity = nvinfer1::ILogger::Severity;
 
 class Logger: public ILogger {
     public:
-        void log(Severity severity, const char* msg) override {
+        void log(Severity severity, const char* msg) noexcept override {
             if (severity != Severity::kINFO) {
                 std::cout << msg << std::endl;
             }
@@ -35,12 +34,19 @@ class Logger: public ILogger {
 struct TrtDeleter {
     template <typename T>
     void operator()(T* obj) const {
-        if (obj) {obj->destroy();}
+        delete obj; 
+    }
+};
+
+struct CudaStreamDeleter {
+    void operator()(cudaStream_t* stream) const {
+        cudaStreamDestroy(*stream);
     }
 };
 
 template <typename T>
-using TrtUniquePtr = std::unique_ptr<T, TrtDeleter>;
+using TrtUnqPtr = std::unique_ptr<T, TrtDeleter>;
+using CudaStreamUnqPtr = std::unique_ptr<cudaStream_t, CudaStreamDeleter>;
 using TrtSharedEnginePtr = std::shared_ptr<ICudaEngine>;
 
 

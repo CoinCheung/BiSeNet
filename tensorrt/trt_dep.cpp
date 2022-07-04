@@ -45,7 +45,7 @@ TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
     unsigned int maxBatchSize{1};
     int memory_limit = 1U << 30; // 1G
 
-    auto builder = TrtUniquePtr<IBuilder>(nvinfer1::createInferBuilder(gLogger));
+    auto builder = TrtUnqPtr<IBuilder>(nvinfer1::createInferBuilder(gLogger));
     if (!builder) {
         cout << "create builder failed\n";
         std::abort();
@@ -53,20 +53,20 @@ TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
 
     const auto explicitBatch = 1U << static_cast<uint32_t>(
             nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
-    auto network = TrtUniquePtr<INetworkDefinition>(
+    auto network = TrtUnqPtr<INetworkDefinition>(
             builder->createNetworkV2(explicitBatch));
     if (!network) {
         cout << "create network failed\n";
         std::abort();
     }
 
-    auto config = TrtUniquePtr<IBuilderConfig>(builder->createBuilderConfig());
+    auto config = TrtUnqPtr<IBuilderConfig>(builder->createBuilderConfig());
     if (!config) {
         cout << "create builder config failed\n";
         std::abort();
     }
 
-    auto parser = TrtUniquePtr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, gLogger));
+    auto parser = TrtUnqPtr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, gLogger));
     if (!parser) {
         cout << "create parser failed\n";
         std::abort();
@@ -84,17 +84,37 @@ TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
     if (use_fp16 && builder->platformHasFastFp16()) {
         config->setFlag(nvinfer1::BuilderFlag::kFP16); // fp16
     }
-    // TODO: see if use dla or int8
 
     auto output = network->getOutput(0);
     output->setType(nvinfer1::DataType::kINT32);
 
+    cout << " start to build \n";
+    CudaStreamUnqPtr stream(new cudaStream_t);
+    if (cudaStreamCreate(stream.get())) {
+        cout << "create stream failed\n";
+        std::abort();
+    }
+    config->setProfileStream(*stream);
+
+    auto plan = TrtUnqPtr<IHostMemory>(builder->buildSerializedNetwork(*network, *config));
+    if (!plan) {
+        cout << "serialization failed\n";
+        std::abort();
+    }
+
+    auto runtime = TrtUnqPtr<IRuntime>(nvinfer1::createInferRuntime(gLogger));
+    if (!plan) {
+        cout << "create runtime failed\n";
+        std::abort();
+    }
+
     TrtSharedEnginePtr engine = shared_engine_ptr(
-            builder->buildEngineWithConfig(*network, *config));
+            runtime->deserializeCudaEngine(plan->data(), plan->size()));
     if (!engine) {
         cout << "create engine failed\n";
         std::abort();
     }
+    cout << "done build engine \n";
 
     return engine;
 }
@@ -102,7 +122,7 @@ TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
 
 void serialize(TrtSharedEnginePtr engine, string save_path) {
 
-    auto trt_stream = TrtUniquePtr<IHostMemory>(engine->serialize());
+    auto trt_stream = TrtUnqPtr<IHostMemory>(engine->serialize());
     if (!trt_stream) {
         cout << "serialize engine failed\n";
         std::abort();
@@ -132,7 +152,7 @@ TrtSharedEnginePtr deserialize(string serpth) {
     ifile.close();
     cout << "model size: " << mdsize << endl;
 
-    auto runtime = TrtUniquePtr<IRuntime>(nvinfer1::createInferRuntime(gLogger));
+    auto runtime = TrtUnqPtr<IRuntime>(nvinfer1::createInferRuntime(gLogger));
     TrtSharedEnginePtr engine = shared_engine_ptr(
             runtime->deserializeCudaEngine((void*)&buf[0], mdsize, nullptr));
     return engine;
@@ -149,7 +169,7 @@ vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data) {
     vector<void*> buffs(2);
     vector<int> res(out_size);
 
-    auto context = TrtUniquePtr<IExecutionContext>(engine->createExecutionContext());
+    auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
     if (!context) {
         cout << "create execution context failed\n";
         std::abort();
@@ -166,34 +186,32 @@ vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data) {
         cout << "allocate memory failed\n";
         std::abort();
     }
-    cudaStream_t stream;
-    state = cudaStreamCreate(&stream);
-    if (state) {
+    CudaStreamUnqPtr stream(new cudaStream_t);
+    if (cudaStreamCreate(stream.get())) {
         cout << "create stream failed\n";
         std::abort();
     }
 
     state = cudaMemcpyAsync(
             buffs[0], &data[0], in_size * sizeof(float),
-            cudaMemcpyHostToDevice, stream);
+            cudaMemcpyHostToDevice, *stream);
     if (state) {
         cout << "transmit to device failed\n";
         std::abort();
     }
-    context->enqueueV2(&buffs[0], stream, nullptr);
+    context->enqueueV2(&buffs[0], *stream, nullptr);
     // context->enqueue(1, &buffs[0], stream, nullptr);
     state = cudaMemcpyAsync(
             &res[0], buffs[1], out_size * sizeof(int), 
-            cudaMemcpyDeviceToHost, stream);
+            cudaMemcpyDeviceToHost, *stream);
     if (state) {
         cout << "transmit to host failed \n";
         std::abort();
     }
-    cudaStreamSynchronize(stream);
+    cudaStreamSynchronize(*stream);
 
     cudaFree(buffs[0]);
     cudaFree(buffs[1]);
-    cudaStreamDestroy(stream);
 
     return res;
 }
@@ -210,7 +228,7 @@ void test_fps_with_engine(TrtSharedEnginePtr engine) {
     const int in_size{batchsize * 3 * iH * iW};
     const int out_size{batchsize * oH * oW};
 
-    auto context = TrtUniquePtr<IExecutionContext>(engine->createExecutionContext());
+    auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
     if (!context) {
         cout << "create execution context failed\n";
         std::abort();
