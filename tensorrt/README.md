@@ -15,7 +15,7 @@ Then we can use either c++ or python to compile the model and run inference.
 
 ### Using C++
 
-#### My platform
+#### 1. My platform
 
 * ubuntu 18.04
 * nvidia Tesla T4 gpu, driver newer than 450.80
@@ -26,7 +26,7 @@ Then we can use either c++ or python to compile the model and run inference.
 
 
 
-#### Build with source code
+#### 2. Build with source code
 Just use the standard cmake build method:  
 ```
 mkdir -p tensorrt/build
@@ -37,7 +37,7 @@ make
 This would generate a `./segment` in the `tensorrt/build` directory.
 
 
-#### Convert onnx to tensorrt model
+#### 3. Convert onnx to tensorrt model
 If you can successfully compile the source code, you can parse the onnx model to tensorrt model like this:  
 ```
 $ ./segment compile /path/to/onnx.model /path/to/saved_model.trt
@@ -49,21 +49,21 @@ $ ./segment compile /path/to/onnx.model /path/to/saved_model.trt --fp16
 Note that I use the simplest method to parse the command line args, so please do **Not** change the order of the args in above command.  
 
 
-#### Infer with one single image
+#### 4. Infer with one single image
 Run inference like this:   
 ```
 $ ./segment run /path/to/saved_model.trt /path/to/input/image.jpg /path/to/saved_img.jpg
 ```
 
 
-#### Test speed  
+#### 5. Test speed  
 The speed depends on the specific gpu platform you are working on, you can test the fps on your gpu like this:  
 ```
 $ ./segment test /path/to/saved_model.trt
 ```
 
 
-#### Tips:  
+#### 6. Tips:  
 1. ~Since tensorrt 7.0.0 cannot parse well the `bilinear interpolation` op exported from pytorch, I replace them with pytorch `nn.PixelShuffle`, which would bring some performance overhead(more flops and parameters), and make inference a bit slower. Also due to the `nn.PixelShuffle` op, you **must** export the onnx model with input size to be *n* times of 32.~   
 If you are using 7.2.3.4 or newer versions, you should not have problem with `interpolate` anymore.
 
@@ -80,7 +80,7 @@ Likewise, you do not need to worry about this anymore with version newer than 7.
 You can also use python script to compile and run inference of your model.  
 
 
-#### Compile model to onnx
+#### 1. Compile model to onnx
 
 With this command: 
 ```
@@ -91,7 +91,7 @@ $ python segment.py compile --onnx /path/to/model.onnx --savepth ./model.trt --q
 This will compile onnx model into tensorrt serialized engine, save save to `./model.trt`.  
 
 
-#### inference with Tensorrt
+#### 2. Inference with Tensorrt
 
 Run Inference like this:  
 ```
