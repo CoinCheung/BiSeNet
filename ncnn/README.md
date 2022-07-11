@@ -14,9 +14,6 @@
 $ python -m pip install onnx-simplifier
 ```
 
-TODO:
-check vulkan
-
 #### 2. build ncnn  
 Just follow the ncnn official tutoral of [build-for-linux](https://github.com/Tencent/ncnn/wiki/how-to-build#build-for-linux) to install ncnn. Following steps are all carried out on my raspberry pi:  
 
