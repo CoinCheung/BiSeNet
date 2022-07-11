@@ -5,11 +5,13 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <omp.h>
 
 #include <iostream>
 #include <random>
 #include <algorithm>
 #include <stdio.h>
+#include <string>
 #include <vector>
 
 
@@ -29,7 +31,15 @@ int main(int argc, char** argv) {
 
 
 void inference() {
-    bool use_fp16 = false;
+    int nthreads = 4;
+    string mod_param = "../models/model_v2_sim.param";
+    string mod_model = "../models/model_v2_sim.bin";
+    int oH{512}, oW{1024}, n_classes{19};
+    float mean[3] = {0.3257f, 0.3690f, 0.3223f};
+    float var[3] = {0.2112f, 0.2148f, 0.2115f};
+    string impth = "../../example.png";
+    string savepth = "out.png";
+    
     // load model
     ncnn::Net mod;
 #if NCNN_VULKAN
@@ -41,30 +51,32 @@ void inference() {
     mod.opt.use_vulkan_compute = 1;
     mod.set_vulkan_device(1);
 #endif 
-    mod.load_param("../models/model_v2_sim.param");
-    mod.load_model("../models/model_v2_sim.bin");
-    mod.opt.use_fp16_packed = use_fp16;
-    mod.opt.use_fp16_storage = use_fp16;
-    mod.opt.use_fp16_arithmetic = use_fp16;
+    mod.load_param(mod_param.c_str());
+    mod.load_model(mod_model.c_str());
+    // ncnn enable fp16 by default, so we do not need these options
+    // int8 depends on the model itself, so we do not set here
+    // bool use_fp16 = false;
+    // mod.opt.use_fp16_packed = use_fp16;
+    // mod.opt.use_fp16_storage = use_fp16;
+    // mod.opt.use_fp16_arithmetic = use_fp16;
 
     // load image, and copy to ncnn mat
-    int oH{1024}, oW{2048}, n_classes{19};
-    float mean[3] = {0.3257f, 0.3690f, 0.3223f};
-    float var[3] = {0.2112f, 0.2148f, 0.2115f};
-    cv::Mat im = cv::imread("../../example.png");
+    cv::Mat im = cv::imread(impth);
     if (im.empty()) {
         fprintf(stderr, "cv::imread failed\n");
         return;
     }
+
     ncnn::Mat inp = ncnn::Mat::from_pixels_resize(
             im.data, ncnn::Mat::PIXEL_BGR, im.cols, im.rows, oW, oH);
     for (float &el : mean) el *= 255.;
-    for (float &el : var) el = 1. / (255. * el);
+    for (float &el : var) el = 1. / (255. * el); 
     inp.substract_mean_normalize(mean, var);
 
     // set input, run, get output
     ncnn::Extractor ex = mod.create_extractor();
-    // ex.set_num_threads(1);
+    ex.set_light_mode(true); // not sure what this mean
+    ex.set_num_threads(nthreads);
 #if NCNN_VULKAN
     ex.set_vulkan_compute(true);
 #endif
@@ -76,14 +88,16 @@ void inference() {
     // generate colorful output, and dump
     vector<vector<uint8_t>> color_map = get_color_map();
     Mat pred(cv::Size(oW, oH), CV_8UC3);
-    for (int i{0}; i < oH; ++i) {
+    int offset = oH * oW;
+    omp_set_num_threads(omp_get_max_threads());
+    #pragma omp parallel for 
+    for (int i=0; i < oH; ++i) {
         uint8_t *ptr = pred.ptr<uint8_t>(i);
         for (int j{0}; j < oW; ++j) {
             // compute argmax
-            int idx, offset, argmax{0}; 
+            int idx, argmax{0}; 
             float max;
             idx = i * oW + j;
-            offset = oH * oW;
             max = out[idx];
             for (int k{1}; k < n_classes; ++k) {
                 idx += offset;
@@ -99,7 +113,10 @@ void inference() {
             ptr += 3;
         }
     }
-    cv::imwrite("out.png", pred);
+    cv::imwrite(savepth, pred);
+
+    ex.clear(); // must have this, or error
+    mod.clear();
 
 }
 
