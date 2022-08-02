@@ -111,6 +111,8 @@ adj.md
 tensorrt/build/*
 datasets/coco/train.txt
 datasets/coco/val.txt
+datasets/ade20k/train.txt
+datasets/ade20k/val.txt
 pretrained/*
 run.sh
 openvino/build/*

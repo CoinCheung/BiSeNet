@@ -4,7 +4,10 @@
 
 Openvino is used to deploy model on intel cpus or "gpu inside cpu".  
 
-My cpu is Intel(R) Xeon(R) Gold 6240 CPU @ 2.60GHz.
+My platform:  
+* Ubuntu 18.04
+* Intel(R) Xeon(R) Gold 6240 CPU @ 2.60GHz
+* openvino_2021.4.689
 
 
 ### preparation
