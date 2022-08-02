@@ -108,7 +108,7 @@ $ cd /path/to/BiSeNet
 $ python tools/gen_dataset_annos.py --dataset coco
 ```
 
-3. ade20k
+3.ade20k
 
 Download `ADEChallengeData2016.zip` from this [website](http://sceneparsing.csail.mit.edu/) and unzip it. Then we can move the uncompressed folders to `datasets/ade20k`, and generate the txt files with the script I prepared for you:  
 ```
@@ -119,7 +119,7 @@ $ python tools/gen_dataset_annos.py --ade20k
 ```
 
 
-4. custom dataset  
+4.custom dataset  
 
 If you want to train on your own dataset, you should generate annotation files first with the format like this: 
 ```
