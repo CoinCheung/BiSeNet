@@ -29,7 +29,7 @@ Tips:
 
 3. The authors of bisenetv2 used cocostuff-10k, while I used cocostuff-123k(do not know how to say, just same 118k train and 5k val images as object detection). Thus the results maybe different from paper. 
 
-4. The authors did not do experiments on ade20k, thus there is no official training settings, here I simply provide a "make it work" result. Maybe the results on ade20k can be boosted with better settings.
+4. The authors did not report results on ade20k, thus there is no official training settings, here I simply provide a "make it work" result. Maybe the results on ade20k can be boosted with better settings.
 
 5. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 on cityscapes for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. 
 
@@ -110,7 +110,7 @@ $ python tools/gen_dataset_annos.py --dataset coco
 
 3. ade20k
 
-Download `ADEChallengeData2016.zip` and unzip it. Then we can move the uncompressed folders to `datasets/ade20k`, and generate the txt files with the script I prepared for you:  
+Download `ADEChallengeData2016.zip` from this [website](http://sceneparsing.csail.mit.edu/) and unzip it. Then we can move the uncompressed folders to `datasets/ade20k`, and generate the txt files with the script I prepared for you:  
 ```
 $ unzip ADEChallengeData2016.zip
 $ mv ADEChallengeData2016/images /path/to/BiSeNet/datasets/ade20k/
