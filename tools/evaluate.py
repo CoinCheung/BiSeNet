@@ -31,9 +31,10 @@ def get_round_size(size, divisor=32):
 
 class SizePreprocessor(object):
 
-    def __init__(self, shape=None, shortside=None):
+    def __init__(self, shape=None, shortside=None, longside=None):
         self.shape = shape
         self.shortside = shortside
+        self.longside = longside
 
     def __call__(self, imgs):
         new_size = None
@@ -45,6 +46,13 @@ class SizePreprocessor(object):
             if h < w: h, w = ss, int(ss / h * w)
             else: h, w = int(ss / w * h), ss
             new_size = h, w
+        elif not self.longside is None: # long size limit
+            h, w = imgs.size()[2:]
+            if max(h, w) > self.longside:
+                ls = self.longside
+                if h < w: h, w = int(ls / w * h), ls
+                else: h, w = ls, int(ls / h * w)
+                new_size = h, w
 
         if not new_size is None:
             imgs = F.interpolate(imgs, size=new_size,
@@ -125,6 +133,7 @@ class MscEvalV0(object):
         self.sp = size_processor
         self.metric_observer = Metrics(n_classes, lb_ignore)
 
+    @torch.no_grad()
     def __call__(self, net, dl):
         ## evaluate
         n_classes = self.n_classes
@@ -305,7 +314,9 @@ def eval_model(cfg, net):
 
     size_processor = SizePreprocessor(
             cfg.get('eval_start_shape'),
-            cfg.get('eval_start_shortside'))
+            cfg.get('eval_start_shortside'),
+            cfg.get('eval_start_longside'),
+            )
 
     single_scale = MscEvalV0(
             n_classes=cfg.n_cats,
@@ -411,7 +422,9 @@ def evaluate(cfg, weight_pth):
 
     ## evaluator
     iou_heads, iou_content, f1_heads, f1_content = eval_model(cfg, net)
+    logger.info('\neval results of f1 score metric:')
     logger.info('\n' + tabulate(f1_content, headers=f1_heads, tablefmt='orgtbl'))
+    logger.info('\neval results of miou metric:')
     logger.info('\n' + tabulate(iou_content, headers=iou_heads, tablefmt='orgtbl'))
 
 
@@ -432,11 +445,9 @@ def main():
         torch.cuda.set_device(local_rank)
         dist.init_process_group(backend='nccl')
     if not osp.exists(cfg.respth): os.makedirs(cfg.respth)
-    setup_logger('{}-eval'.format(cfg.model_type), cfg.respth)
+    setup_logger(f'{cfg.model_type}-{cfg.dataset.lower()}-eval', cfg.respth)
     evaluate(cfg, args.weight_pth)
 
 
 if __name__ == "__main__":
     main()
-     # 0.70646 |            0.719953 |  0.715522 |       0.712184
-     # 0.70646  | 0.719953 | 0.715522 | 0.712184

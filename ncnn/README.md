@@ -2,8 +2,8 @@
 ### My platform
 
 * raspberry pi 3b
-* armv8 4core cpu, 1G Memroy
 * 2022-04-04-raspios-bullseye-armhf-lite.img 
+* cpu: 4 core armv8, memory: 1G 
 
 
 

@@ -62,15 +62,12 @@ for impth, lbpth in tqdm(zip(impaths, lbpaths), total=n_pairs):
         max_lb_val = max(max_lb_val, np.max(lb))
         min_lb_val = min(min_lb_val, np.min(lb))
 
-min_lb_val = 0
-max_lb_val = 181
-lb_minlength = 182
 ## label info
 lb_minlength = max_lb_val+1-min_lb_val
 lb_hist = np.zeros(lb_minlength)
 for lbpth in tqdm(lbpaths):
     lb = cv2.imread(lbpth, 0)
-    lb = lb[lb != lb_ignore] + min_lb_val
+    lb = lb[lb != lb_ignore] - min_lb_val
     lb_hist += np.bincount(lb, minlength=lb_minlength)
 
 lb_missing_vals = [ind + min_lb_val
@@ -113,7 +110,7 @@ print('\n')
 print(f'we ignore label value of {args.lb_ignore} in label images')
 print(f'label values are within range of [{min_lb_val}, {max_lb_val}]')
 print(f'label values that are missing: {lb_missing_vals}')
-print('ratios of each label value: ')
+print('ratios of each label value(from small to big, without ignored): ')
 print('\t', lb_ratios)
 print('\n')
 

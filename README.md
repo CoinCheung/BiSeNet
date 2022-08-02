@@ -15,6 +15,12 @@ mIOUs on cocostuff val2017 set:
 | bisenetv1 | 31.49 | 31.42 | 32.46 | 32.55 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_coco_new.pth) |
 | bisenetv2 | 30.49 | 30.55 | 31.81 | 31.73 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_coco.pth) |
 
+mIOUs on ade20k val set:
+| none | ss | ssc | msf | mscf | link |
+|------|:--:|:---:|:---:|:----:|:----:|
+| bisenetv1 | 36.15 | 36.04 | 37.27 | 36.58 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_ade20k.pth) |
+| bisenetv2 | 32.53 | 32.43 | 33.23 | 31.72 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_ade20k.pth) |
+
 Tips: 
 
 1. **ss** means single scale evaluation, **ssc** means single scale crop evaluation, **msf** means multi-scale evaluation with flip augment, and **mscf** means multi-scale crop evaluation with flip evaluation. The eval scales and crop size of multi-scales evaluation can be found in [configs](./configs/).
@@ -23,7 +29,9 @@ Tips:
 
 3. The authors of bisenetv2 used cocostuff-10k, while I used cocostuff-123k(do not know how to say, just same 118k train and 5k val images as object detection). Thus the results maybe different from paper. 
 
-4. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. 
+4. The authors did not report results on ade20k, thus there is no official training settings, here I simply provide a "make it work" result. Maybe the results on ade20k can be boosted with better settings.
+
+5. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 on cityscapes for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. 
 
 
 ## deploy trained models
@@ -85,7 +93,7 @@ $ unzip gtFine_trainvaltest.zip
 
 2.cocostuff   
 
-Download `train2017.zip`, `val2017.zip` and `stuffthingmaps_trainval2017.zip` split from official [website](https://cocodataset.org/#download). Then do as following:
+Download `train2017.zip`, `val2017.zip` and `stuffthingmaps_trainval2017.zip` split from official [website](https://cocodataset.org/#download). Then do as following:  
 ```
 $ unzip train2017.zip
 $ unzip val2017.zip
@@ -97,10 +105,21 @@ $ mv train2017/ /path/to/BiSeNet/datasets/coco/labels
 $ mv val2017/ /path/to/BiSeNet/datasets/coco/labels
 
 $ cd /path/to/BiSeNet
-$ python tools/gen_coco_annos.py
+$ python tools/gen_dataset_annos.py --dataset coco
 ```
 
-3.custom dataset  
+3.ade20k
+
+Download `ADEChallengeData2016.zip` from this [website](http://sceneparsing.csail.mit.edu/) and unzip it. Then we can move the uncompressed folders to `datasets/ade20k`, and generate the txt files with the script I prepared for you:  
+```
+$ unzip ADEChallengeData2016.zip
+$ mv ADEChallengeData2016/images /path/to/BiSeNet/datasets/ade20k/
+$ mv ADEChallengeData2016/annotations /path/to/BiSeNet/datasets/ade20k/
+$ python tools/gen_dataset_annos.py --ade20k
+```
+
+
+4.custom dataset  
 
 If you want to train on your own dataset, you should generate annotation files first with the format like this: 
 ```
