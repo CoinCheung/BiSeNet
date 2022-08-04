@@ -30,3 +30,17 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 cfg_file=configs/bisenetv2_coco.py
 NGPUS=8
 torchrun --nproc_per_node=$NGPUS tools/train_amp.py --config $cfg_file
+
+
+## bisenetv1 ade20k
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+cfg_file=configs/bisenetv1_ade20k.py
+NGPUS=8
+torchrun --nproc_per_node=$NGPUS tools/train_amp.py --config $cfg_file
+
+
+## bisenetv2 ade20k
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+cfg_file=configs/bisenetv2_ade20k.py
+NGPUS=8
+torchrun --nproc_per_node=$NGPUS tools/train_amp.py --config $cfg_file
