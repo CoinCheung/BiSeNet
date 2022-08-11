@@ -143,10 +143,10 @@ def main():
             cuda.memcpy_dtoh_async(h_output, d_output, stream)
         stream.synchronize()
 
-        out = palette[h_outputs[0]]
-        outshape = engine.get_binding_shape(1)
-        H, W = outshape[1], outshape[2]
-        out = out.reshape(H, W, 3)
+        oshape = engine.get_binding_shape(1)
+        pred = np.argmax(h_outputs[0].reshape(oshape), axis=1)
+        out = palette[pred]
+        out = out.reshape(*oshape[2:], 3)
         out = cv2.resize(out, (orgW, orgH))
         cv2.imwrite(args.outpth, out)
 

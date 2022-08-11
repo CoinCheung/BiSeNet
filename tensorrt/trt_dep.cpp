@@ -4,10 +4,12 @@
 #include <fstream>
 #include <vector>
 #include <array>
+#include <unordered_map>
 #include <sstream>
 #include <chrono>
 
 #include "trt_dep.hpp"
+#include "kernels.hpp"
 
 
 using nvinfer1::IHostMemory;
@@ -43,7 +45,7 @@ TrtSharedEnginePtr shared_engine_ptr(ICudaEngine* ptr) {
 
 TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
     unsigned int maxBatchSize{1};
-    int memory_limit = 1U << 30; // 1G
+    long memory_limit = 1UL << 32; // 4G
 
     auto builder = TrtUnqPtr<IBuilder>(nvinfer1::createInferBuilder(gLogger));
     if (!builder) {
@@ -86,7 +88,8 @@ TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
     }
 
     auto output = network->getOutput(0);
-    output->setType(nvinfer1::DataType::kINT32);
+    // output->setType(nvinfer1::DataType::kINT32);
+    output->setType(nvinfer1::DataType::kFLOAT);
 
     cout << " start to build \n";
     CudaStreamUnqPtr stream(new cudaStream_t);
@@ -154,7 +157,7 @@ TrtSharedEnginePtr deserialize(string serpth) {
 
     auto runtime = TrtUnqPtr<IRuntime>(nvinfer1::createInferRuntime(gLogger));
     TrtSharedEnginePtr engine = shared_engine_ptr(
-            runtime->deserializeCudaEngine((void*)&buf[0], mdsize, nullptr));
+            runtime->deserializeCudaEngine((void*)&buf[0], mdsize));
     return engine;
 }
 
@@ -163,10 +166,12 @@ vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data) {
     Dims3 out_dims = static_cast<Dims3&&>(
         engine->getBindingDimensions(engine->getBindingIndex("preds")));
 
-    const int batchsize{1}, H{out_dims.d[1]}, W{out_dims.d[2]};
+    const int batchsize{1}, H{out_dims.d[2]}, W{out_dims.d[3]};
+    const int n_classes{out_dims.d[1]};
     const int in_size{static_cast<int>(data.size())};
+    const int logits_size{batchsize * n_classes * H * W};
     const int out_size{batchsize * H * W};
-    vector<void*> buffs(2);
+    vector<void*> buffs(3);
     vector<int> res(out_size);
 
     auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
@@ -181,7 +186,12 @@ vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data) {
         cout << "allocate memory failed\n";
         std::abort();
     }
-    state = cudaMalloc(&buffs[1], out_size * sizeof(int));
+    state = cudaMalloc(&buffs[1], logits_size * sizeof(float));
+    if (state) {
+        cout << "allocate memory failed\n";
+        std::abort();
+    }
+    state = cudaMalloc(&buffs[2], out_size * sizeof(int));
     if (state) {
         cout << "allocate memory failed\n";
         std::abort();
@@ -199,19 +209,24 @@ vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data) {
         cout << "transmit to device failed\n";
         std::abort();
     }
+
     context->enqueueV2(&buffs[0], *stream, nullptr);
     // context->enqueue(1, &buffs[0], stream, nullptr);
+    argMaxFunc(buffs[1], buffs[2], batchsize, n_classes, H * W, stream.get());
+
     state = cudaMemcpyAsync(
-            &res[0], buffs[1], out_size * sizeof(int), 
+            &res[0], buffs[2], out_size * sizeof(int),
             cudaMemcpyDeviceToHost, *stream);
     if (state) {
         cout << "transmit to host failed \n";
         std::abort();
     }
+
     cudaStreamSynchronize(*stream);
 
     cudaFree(buffs[0]);
     cudaFree(buffs[1]);
+    cudaFree(buffs[2]);
 
     return res;
 }
@@ -222,10 +237,13 @@ void test_fps_with_engine(TrtSharedEnginePtr engine) {
         engine->getBindingDimensions(engine->getBindingIndex("input_image")));
     Dims3 out_dims = static_cast<Dims3&&>(
         engine->getBindingDimensions(engine->getBindingIndex("preds")));
+
     const int batchsize{1};
-    const int oH{out_dims.d[1]}, oW{out_dims.d[2]};
+    const int oH{out_dims.d[2]}, oW{out_dims.d[3]};
+    const int n_classes{out_dims.d[1]};
     const int iH{in_dims.d[2]}, iW{in_dims.d[3]};
     const int in_size{batchsize * 3 * iH * iW};
+    const int logits_size{batchsize * n_classes * oH * oW};
     const int out_size{batchsize * oH * oW};
 
     auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
@@ -234,14 +252,19 @@ void test_fps_with_engine(TrtSharedEnginePtr engine) {
         std::abort();
     }
 
-    vector<void*> buffs(2);
+    vector<void*> buffs(3);
     cudaError_t state;
     state = cudaMalloc(&buffs[0], in_size * sizeof(float));
     if (state) {
         cout << "allocate memory failed\n"; 
         std::abort();
     }
-    state = cudaMalloc(&buffs[1], out_size * sizeof(int));
+    state = cudaMalloc(&buffs[1], logits_size * sizeof(float));
+    if (state) {
+        cout << "allocate memory failed\n";
+        std::abort();
+    }
+    state = cudaMalloc(&buffs[2], out_size * sizeof(int));
     if (state) {
         cout << "allocate memory failed\n";
         std::abort();
@@ -253,6 +276,7 @@ void test_fps_with_engine(TrtSharedEnginePtr engine) {
     for (int i{0}; i < n_loops; ++i) {
         // context->execute(1, &buffs[0]);
         context->executeV2(&buffs[0]);
+        argMaxFunc(buffs[1], buffs[2], batchsize, n_classes, oH * oW, nullptr);
     }
     auto end = std::chrono::steady_clock::now();
     double duration = std::chrono::duration<double, std::milli>(end - start).count();
@@ -261,7 +285,9 @@ void test_fps_with_engine(TrtSharedEnginePtr engine) {
         << duration << "s" << endl; 
     cout << "fps is: " << static_cast<double>(n_loops) / duration << endl;
 
+
     cudaFree(buffs[0]);
     cudaFree(buffs[1]);
+    cudaFree(buffs[2]);
 }
 
