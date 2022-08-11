@@ -102,7 +102,7 @@ void run_with_trt(vector<string> args) {
     Dims3 o_dims = static_cast<Dims3&&>(
         engine->getBindingDimensions(engine->getBindingIndex("preds")));
     const int iH{i_dims.d[2]}, iW{i_dims.d[3]};
-    const int oH{o_dims.d[1]}, oW{o_dims.d[2]};
+    const int oH{o_dims.d[2]}, oW{o_dims.d[3]};
 
     // prepare image and resize
     Mat im = cv::imread(args[2]);
@@ -150,13 +150,13 @@ void run_with_trt(vector<string> args) {
             ptr[1] = color_map[res[idx]][1];
             ptr[2] = color_map[res[idx]][2];
             ptr += 3;
-            ++ idx;
+            ++idx;
         }
     }
 
     // resize back and save
     if ((orgH != oH) || orgW != oW) {
-        cv::resize(pred, pred, cv::Size(orgW, orgH), cv::INTER_NEAREST);
+        cv::resize(pred, pred, cv::Size(orgW, orgH), cv::INTER_CUBIC);
     }
     cv::imwrite(args[3], pred);
 
