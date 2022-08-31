@@ -13,19 +13,34 @@ palette = np.random.randint(0, 256, (100, 3))
 
 
 
-#  url = '10.128.61.7:8001'
-url = '127.0.0.1:8001'
-model_name = 'bisenetv2'
+url = '10.128.61.8:8001'
+#  url = '127.0.0.1:8001'
+model_name = 'bisenetv1'
 model_version = '1'
-inp_name = 'input_image'
+inp_name = 'raw_img_bytes'
 outp_name = 'preds'
-inp_dtype = 'FP32'
+inp_dtype = 'UINT8'
 outp_dtype = np.int64
-inp_shape = [1, 3, 1024, 2048]
-outp_shape = [1024, 2048]
 impth = '../example.png'
 mean = [0.3257, 0.3690, 0.3223] # city, rgb
 std = [0.2112, 0.2148, 0.2115]
+
+
+## input data and mean/std
+inp_data = np.fromfile(impth, dtype=np.uint8)[None, ...]
+mean = np.array(mean, dtype=np.float32)[None, ...]
+std = np.array(std, dtype=np.float32)[None, ...]
+inputs = [service_pb2.ModelInferRequest().InferInputTensor() for _ in range(3)]
+inputs[0].name = inp_name
+inputs[0].datatype = inp_dtype
+inputs[0].shape.extend(inp_data.shape)
+inputs[1].name = 'channel_mean'
+inputs[1].datatype = 'FP32'
+inputs[1].shape.extend(mean.shape)
+inputs[2].name = 'channel_std'
+inputs[2].datatype = 'FP32'
+inputs[2].shape.extend(std.shape)
+inp_bytes = [inp_data.tobytes(), mean.tobytes(), std.tobytes()]
 
 
 option = [
@@ -52,37 +67,22 @@ request = service_pb2.ModelInferRequest()
 request.model_name = model_name
 request.model_version = model_version
 
-inp = service_pb2.ModelInferRequest().InferInputTensor()
-inp.name = inp_name
-inp.datatype = inp_dtype
-inp.shape.extend(inp_shape)
-
-
-mean = np.array(mean).reshape(1, 1, 3)
-std = np.array(std).reshape(1, 1, 3)
-im = cv2.imread(impth)[:, :, ::-1]
-im = cv2.resize(im, dsize=tuple(inp_shape[-1:-3:-1]))
-im = ((im / 255.) - mean) / std
-im = im[None, ...].transpose(0, 3, 1, 2)
-inp_bytes = im.astype(np.float32).tobytes()
-
 request.ClearField("inputs")
 request.ClearField("raw_input_contents")
-request.inputs.extend([inp,])
-request.raw_input_contents.extend([inp_bytes,])
+request.inputs.extend(inputs)
+request.raw_input_contents.extend(inp_bytes)
 
-
-outp = service_pb2.ModelInferRequest().InferRequestedOutputTensor()
-outp.name = outp_name
-request.outputs.extend([outp,])
 
 # sync
-#  resp = grpc_stub.ModelInfer(request).raw_output_contents[0]
+#  resp = grpc_stub.ModelInfer(request)
 # async
 resp = grpc_stub.ModelInfer.future(request)
-resp = resp.result().raw_output_contents[0]
+resp = resp.result()
 
-out = np.frombuffer(resp, dtype=outp_dtype).reshape(*outp_shape)
+outp_bytes = resp.raw_output_contents[0]
+outp_shape = resp.outputs[0].shape
+
+out = np.frombuffer(outp_bytes, dtype=outp_dtype).reshape(*outp_shape).squeeze()
 
 out = palette[out]
 cv2.imwrite('res.png', out)

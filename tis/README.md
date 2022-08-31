@@ -23,13 +23,38 @@ $ python tools/export_onnx.py --config configs/bisenetv2_city.py --weight-path /
 $ cp -riv ./model.onnx tis/models/bisenetv2/1
 ```
 
-#### 2. start service
-We start serving with docker:
+#### 2. prepare the preprocessing backend
+We can use either python backend or cpp backend for preprocessing in the server side.  
+Firstly, we pull the docker image, and start a serving container:  
 ```
-$ docker pull nvcr.io/nvidia/tritonserver:21.10-py3
-$ docker run --gpus all --rm -p8000:8000 -p8001:8001 -p8002:8002 -v /path/to/BiSeNet/tis/models:/models nvcr.io/nvidia/tritonserver:21.10-py3 tritonserver --model-repository=/models
+$ docker pull nvcr.io/nvidia/tritonserver:22.07-py3
+$ docker run -it --gpus all --rm -p8000:8000 -p8001:8001 -p8002:8002 -v /path/to/BiSeNet/tis/models:/models -v /path/to/BiSeNet/:/BiSeNet nvcr.io/nvidia/tritonserver:21.10-py3 bash
 ```
+From here on, we are in the container environment. Let's prepare the backends in the container:  
+```
+# ln -s /usr/local/bin/pip3.8 /usr/bin/pip3.8
+# /usr/bin/python3 -m pip install pillow
+# apt update && apt install rapidjson-dev libopencv-dev
+```
+Then we download cmake 3.22 and unzip in the container, we use this cmake 3.22 in the following operations.  
+We compile c++ backends:   
+```
+# cp -riv /BiSeNet/tis/self_backend /opt/tritonserver/backends
+# chmod 777 /opt/tritonserver/backends/self_backend
+# cd /opt/tritonserver/backends/self_backend
+# mkdir -p build && cd build
+# cmake .. && make -j4
+# mv -iuv libtriton_self_backend.so ..
+```
+Utils now, we should have backends prepared.
 
+
+
+#### 3. start service
+We start the server in the docker container, following the above steps:  
+```
+# tritonserver --model-repository=/models 
+```
 In general, the service would start now. You can check whether service has started by:  
 ```
 $ curl -v localhost:8000/v2/health/ready
@@ -38,9 +63,11 @@ $ curl -v localhost:8000/v2/health/ready
 By default, we use gpu 0 and gpu 1, you can change configurations in the `config.pbtxt` file.
 
 
-### Client
+### Request with client
 
 We call the model service with both python and c++ method.  
+
+From here on, we are at the client machine, rather than the server docker container.  
 
 
 #### 1. python method
@@ -50,10 +77,11 @@ Firstly, we need to install dependency package:
 $ python -m pip install tritonclient[all]==2.15.0
 ```
 
-Then we can run the script: 
+Then we can run the script for both http request and grpc request: 
 ```
 $ cd BiSeNet/tis
-$ python client.py
+$ python client_http.py  # if you want to use http client
+$ python client_grpc.py  # if you want to use grpc client
 ```
 
 This would generate a result file named `res.jpg` in `BiSeNet/tis` directory.
@@ -92,4 +120,4 @@ Finally, we run the client and see a result file named `res.jpg` generated:
 
 ### In the end
 
-This is a simple demo with only basic function. There are many other features that is useful, such as shared memory and model pipeline. If you have interest on this, you can learn more in the official document.
+This is a simple demo with only basic function. There are many other features that is useful, such as shared memory and dynamic batching. If you have interests on this, you can learn more in the official document.

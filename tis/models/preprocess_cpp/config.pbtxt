@@ -1,0 +1,35 @@
+name: "preprocess_cpp"
+backend: "self_backend"
+max_batch_size: 256
+# dynamic_batching { ## this is not allowed, since we cannot know raw bytes size of each inputs from the server, as they just concat the bytes together
+#   max_queue_delay_microseconds: 5000000
+# }
+input [
+{
+    name: "raw_img_bytes"
+    data_type: TYPE_UINT8
+    dims: [ -1 ]
+},
+{
+    name: "channel_mean"
+    data_type: TYPE_FP32
+    dims: [ 3 ]
+},
+{
+    name: "channel_std"
+    data_type: TYPE_FP32
+    dims: [ 3 ]
+}
+]
+output [
+  {
+    name: "processed_img"
+    data_type: TYPE_FP32
+    dims: [ 1,  3, 1024, 2048 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+  }
+]

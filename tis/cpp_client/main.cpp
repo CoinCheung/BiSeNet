@@ -1,6 +1,7 @@
 
 #include <random>
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <memory>
 #include <vector>
@@ -27,28 +28,28 @@ namespace tc = triton::client;
   }
 
 
-// std::string url("10.128.61.8:8001");
-std::string url("127.0.0.1:8001");
+std::string url("10.128.61.8:8001");
+// std::string url("127.0.0.1:8001");
 std::string model_name("bisenetv1");
 std::string model_version("1");
 uint32_t client_timeout{5000000}; 
-bool verbose = false;
 
 std::string impth("../../../example.png"); 
 std::string savepth("./res.jpg"); 
-std::vector<int64_t> inp_shape{1, 3, 1024, 2048};
-std::vector<int64_t> outp_shape{1, 1024, 2048};
-std::string inp_name("input_image");
+std::vector<float> mean{0.3257, 0.3690, 0.3223}; // city, rgb
+std::vector<float> var{0.2112, 0.2148, 0.2115};
+std::string inp_name("raw_img_bytes");
 std::string outp_name("preds");
-std::string inp_type("FP32");
+std::string inp_type("UINT8");
 
 
 
 std::vector<std::vector<uint8_t>> get_color_map();
 std::vector<float> get_image(std::string, std::vector<int64_t>&);
-void save_predict(std::string, int64_t*, 
-        std::vector<int64_t>, std::vector<int64_t>);
+std::vector<uint8_t> get_image_bytes(std::string);
+void save_predict(std::string, int64_t*, std::vector<int64_t>);
 void do_inference();
+void do_inference_with_bytes(std::vector<uint8_t>&, bool);
 void print_infos();
 void test_speed();
 
@@ -62,32 +63,55 @@ int main() {
 
 
 void do_inference() {
+    // create input 
+    // std::vector<float> inp_data = get_image(impth, inp_shape);
+    std::vector<uint8_t> inp_data = get_image_bytes(impth);
+    std::cout << "read image: " << impth << std::endl;
+    do_inference_with_bytes(inp_data, true);
+}
+
+
+void do_inference_with_bytes(std::vector<uint8_t>& inp_data, bool verbose) {
 
     // define client
     std::unique_ptr<tc::InferenceServerGrpcClient> client;
     FAIL_IF_ERR(
-        tc::InferenceServerGrpcClient::Create(&client, url, verbose),
+        tc::InferenceServerGrpcClient::Create(&client, url, false), // verbose=false
         "unable to create grpc client");
-    std::cout << "create client\n";
+    if (verbose) std::cout << "create client\n";
 
-    // create input 
-    std::vector<float> input_data = get_image(impth, inp_shape);
-    std::cout << "read image: " << impth << std::endl;
-
+    //// raw image
     tc::InferInput* input;
     FAIL_IF_ERR(
-        tc::InferInput::Create(&input, inp_name, inp_shape, inp_type), 
-        "unable to get input");
+        tc::InferInput::Create(&input, inp_name, 
+            {1, static_cast<int>(inp_data.size())}, inp_type), 
+        "unable to get input data");
     std::shared_ptr<tc::InferInput> input_ptr;
     input_ptr.reset(input);
-    FAIL_IF_ERR(input_ptr->Reset(), // reset input
-        "unable to reset input data");
+    FAIL_IF_ERR(input_ptr->Reset(), "unable to reset input data");
+    FAIL_IF_ERR(input_ptr->AppendRaw(inp_data), "unable to set data for input");
+    //// mean/std
+    tc::InferInput *inp_mean, *inp_std;
     FAIL_IF_ERR(
-        input_ptr->AppendRaw(
-            reinterpret_cast<uint8_t*>(&input_data[0]),
-            input_data.size() * sizeof(float)), // NOTE: float can be others according to input type
-        "unable to set data for input");
-    std::cout << "set input\n";
+        tc::InferInput::Create(&inp_mean, "channel_mean", {1, 3}, "FP32"), 
+        "unable to get input mean");
+    FAIL_IF_ERR(
+        tc::InferInput::Create(&inp_std, "channel_std", {1, 3}, "FP32"), 
+        "unable to get input std");
+    std::shared_ptr<tc::InferInput> inp_mean_ptr, inp_std_ptr;
+    inp_mean_ptr.reset(inp_mean);
+    inp_std_ptr.reset(inp_std);
+    FAIL_IF_ERR(inp_mean_ptr->Reset(), "unable to reset input mean");
+    FAIL_IF_ERR(inp_std_ptr->Reset(), "unable to reset input std");
+    FAIL_IF_ERR(
+        inp_mean_ptr->AppendRaw(reinterpret_cast<uint8_t*>(&mean[0]), // must be uint8_t data type
+            mean.size() * sizeof(float)),
+        "unable to set data for input mean");
+    FAIL_IF_ERR(
+        inp_std_ptr->AppendRaw(reinterpret_cast<uint8_t*>(&var[0]), 
+            var.size() * sizeof(float)),
+        "unable to set data for input std");
+    if (verbose) std::cout << "set input\n";
 
 
     // create output
@@ -97,7 +121,7 @@ void do_inference() {
         "unable to get output");
     std::shared_ptr<tc::InferRequestedOutput> output_ptr;
     output_ptr.reset(output);
-    std::cout << "set output\n";
+    if (verbose) std::cout << "set output\n";
 
     // infer options
     tc::InferOptions options(model_name);
@@ -106,10 +130,11 @@ void do_inference() {
     tc::Headers http_headers;
     grpc_compression_algorithm compression_algorithm =
         grpc_compression_algorithm::GRPC_COMPRESS_NONE;
-    std::cout << "set options\n";
+    if (verbose) std::cout << "set options\n";
 
     // inference
-    std::vector<tc::InferInput*> inputs = {input_ptr.get()};
+    std::vector<tc::InferInput*> inputs = {input_ptr.get(), 
+        inp_mean_ptr.get(), inp_std_ptr.get()};
     std::vector<const tc::InferRequestedOutput*> outputs = {output_ptr.get()};
     tc::InferResult* results;
     FAIL_IF_ERR(
@@ -122,24 +147,29 @@ void do_inference() {
     FAIL_IF_ERR(
         results_ptr->RequestStatus(), 
         "inference failed");
-    std::cout << "send request and do inference\n";
+    if (verbose) std::cout << "send request and do inference\n";
 
     // parse output
-    int64_t* raw_oup{nullptr}; // NOTE: int64_t is used according to model
+    int64_t* raw_outp{nullptr}; // NOTE: int64_t is used according to model
     size_t n_bytes{0};
     FAIL_IF_ERR(
         results_ptr->RawData(
-            outp_name, (const uint8_t**)(&raw_oup), &n_bytes),
+            outp_name, (const uint8_t**)(&raw_outp), &n_bytes),
         "fetch output failed");
-    if (n_bytes != outp_shape[1] * outp_shape[2] * sizeof(int64_t)) {
+    std::vector<int64_t> outp_shape;
+    FAIL_IF_ERR(
+        results_ptr->Shape(outp_name, &outp_shape),
+        "get output shape failed");
+    if (n_bytes != std::accumulate(outp_shape.begin(), outp_shape.end(), 1,
+                std::multiplies<int64_t>()) * sizeof(int64_t)) {
         std::cerr << "output shape is not set correctly\n";
         exit(1);
     }
-    std::cout << "fetch output\n";
+    if (verbose) std::cout << "fetch output\n";
 
     // save colorful result
-    save_predict(savepth, raw_oup, inp_shape, outp_shape);
-    std::cout << "save inference result to：" << savepth << std::endl;
+    save_predict(savepth, raw_outp, outp_shape);
+    if (verbose) std::cout << "save inference result to：" << savepth << std::endl;
 }
 
 
@@ -176,6 +206,24 @@ std::vector<float> get_image(std::string impth, std::vector<int64_t>& shape) {
 }
 
 
+std::vector<uint8_t> get_image_bytes(std::string impth) {
+    std::ifstream fin(impth, std::ios::in|std::ios::binary);
+    fin.seekg(0, fin.end);
+    int nbytes = fin.tellg();
+    if (nbytes == -1) {
+        std::cerr << "image file read failed: " << impth << std::endl;
+        exit(1);
+    }
+    fin.clear();
+    fin.seekg(0);
+
+    std::vector<uint8_t> res(nbytes);
+    fin.read(reinterpret_cast<char*>(&res[0]), nbytes);
+    fin.close();
+
+    return res;
+}
+
 std::vector<std::vector<uint8_t>> get_color_map() {
     std::vector<std::vector<uint8_t>> color_map(256, 
             std::vector<uint8_t>(3));
@@ -191,12 +239,10 @@ std::vector<std::vector<uint8_t>> get_color_map() {
 
 
 void save_predict(std::string savename, int64_t* data, 
-        std::vector<int64_t> insize, 
         std::vector<int64_t> outsize) {
-
     std::vector<std::vector<uint8_t>> color_map = get_color_map();
-    int64_t oH = outsize[1];
-    int64_t oW = outsize[2];
+    int64_t oH = outsize[2]; // outsize is n1hw
+    int64_t oW = outsize[3];
     cv::Mat pred(cv::Size(oW, oH), CV_8UC3);
     int idx{0};
     for (int i{0}; i < oH; ++i) {
@@ -213,11 +259,12 @@ void save_predict(std::string savename, int64_t* data,
 }
 
 
+
 void print_infos() {
     // define client
     std::unique_ptr<tc::InferenceServerGrpcClient> client;
     FAIL_IF_ERR(
-        tc::InferenceServerGrpcClient::Create(&client, url, verbose),
+        tc::InferenceServerGrpcClient::Create(&client, url, false),
         "unable to create grpc client");
 
     tc::Headers http_headers;
@@ -258,73 +305,22 @@ void print_infos() {
 
 
 void test_speed() {
-    // define client
-    std::unique_ptr<tc::InferenceServerGrpcClient> client;
-    FAIL_IF_ERR(
-        tc::InferenceServerGrpcClient::Create(&client, url, verbose),
-        "unable to create grpc client");
 
-    // create input 
-    std::vector<float> input_data(std::accumulate(
-        inp_shape.begin(), inp_shape.end(), 
-        1, std::multiplies<int64_t>())
-    );
-    tc::InferInput* input;
-    FAIL_IF_ERR(
-        tc::InferInput::Create(&input, inp_name, inp_shape, inp_type), 
-        "unable to get input");
-    std::shared_ptr<tc::InferInput> input_ptr;
-    input_ptr.reset(input);
-    FAIL_IF_ERR(input_ptr->Reset(), // reset input
-        "unable to reset input data");
-    FAIL_IF_ERR(
-        input_ptr->AppendRaw(
-            reinterpret_cast<uint8_t*>(&input_data[0]),
-            input_data.size() * sizeof(float)), // NOTE: float can be others according to input type
-        "unable to set data for input");
-
-    // create output
-    tc::InferRequestedOutput* output;
-    FAIL_IF_ERR(
-        tc::InferRequestedOutput::Create(&output, outp_name),
-        "unable to get output");
-    std::shared_ptr<tc::InferRequestedOutput> output_ptr;
-    output_ptr.reset(output);
-
-    // infer options
-    tc::InferOptions options(model_name);
-    options.model_version_ = model_version;
-    options.client_timeout_ = client_timeout;
-    tc::Headers http_headers;
-    grpc_compression_algorithm compression_algorithm =
-        grpc_compression_algorithm::GRPC_COMPRESS_NONE;
-
-    // inference
-    std::vector<tc::InferInput*> inputs = {input_ptr.get()};
-    std::vector<const tc::InferRequestedOutput*> outputs = {output_ptr.get()};
-    tc::InferResult* results;
+    std::vector<uint8_t> inp_data = get_image_bytes(impth);
+    // warmup
+    do_inference_with_bytes(inp_data, false);
 
     std::cout << "test speed ... \n";
     const int n_loops{500};
     auto start = std::chrono::steady_clock::now();
     for (int i{0}; i < n_loops; ++i) {
-        FAIL_IF_ERR(
-            client->Infer(
-                &results, options, inputs, outputs, http_headers,
-                compression_algorithm),
-            "failed sending synchronous infer request");
+        do_inference_with_bytes(inp_data, false);
     }
     auto end = std::chrono::steady_clock::now();
-
-    std::shared_ptr<tc::InferResult> results_ptr;
-    results_ptr.reset(results);
-    FAIL_IF_ERR(
-        results_ptr->RequestStatus(), 
-        "inference failed");
 
     double duration = std::chrono::duration<double, std::milli>(end - start).count();
     duration /= 1000.;
     std::cout << "running " << n_loops << " times, use time: "
-        << duration << "s" << std::endl; 
+        << duration << "s" << std::endl;
     std::cout << "fps is: " << static_cast<double>(n_loops) / duration << std::endl;
 }
