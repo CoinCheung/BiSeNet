@@ -15,6 +15,8 @@ link_directories(${PROJECT_SOURCE_DIR}/build)
 find_package(CUDA REQUIRED)
 find_package(OpenCV REQUIRED)
 
+cuda_add_library(kernels STATIC kernels.cu)
+
 add_executable(segment segment.cpp trt_dep.cpp)
 target_include_directories(
     segment PUBLIC ${CUDA_INCLUDE_DIRS} ${CUDNN_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
@@ -23,4 +25,3 @@ target_link_libraries(
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES})
 
-cuda_add_library(kernels STATIC kernels.cu)
