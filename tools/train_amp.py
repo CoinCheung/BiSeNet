@@ -28,6 +28,7 @@ from lib.meters import TimeMeter, AvgMeter
 from lib.logger import setup_logger, print_log_msg
 
 
+
 ## fix all random seeds
 #  torch.manual_seed(123)
 #  torch.cuda.manual_seed(123)
@@ -36,8 +37,6 @@ from lib.logger import setup_logger, print_log_msg
 #  torch.backends.cudnn.deterministic = True
 #  torch.backends.cudnn.benchmark = True
 #  torch.multiprocessing.set_sharing_strategy('file_system')
-
-
 
 
 def parse_args():
@@ -49,7 +48,6 @@ def parse_args():
 
 args = parse_args()
 cfg = set_cfg_from_file(args.config)
-
 
 
 def set_model(lb_ignore=255):

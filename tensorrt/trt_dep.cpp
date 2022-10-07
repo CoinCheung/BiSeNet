@@ -9,6 +9,8 @@
 #include <chrono>
 
 #include "trt_dep.hpp"
+#include "batch_stream.hpp"
+#include "entropy_calibrator.hpp"
 #include "kernels.hpp"
 
 
@@ -43,7 +45,8 @@ TrtSharedEnginePtr shared_engine_ptr(ICudaEngine* ptr) {
 }
 
 
-TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
+TrtSharedEnginePtr parse_to_engine(string onnx_pth, 
+        string quant, string data_root, string data_file) {
     unsigned int maxBatchSize{1};
     long memory_limit = 1UL << 32; // 4G
 
@@ -81,10 +84,25 @@ TrtSharedEnginePtr parse_to_engine(string onnx_pth, bool use_fp16) {
         std::abort();
     }
 
-
     config->setMaxWorkspaceSize(memory_limit);
-    if (use_fp16 && builder->platformHasFastFp16()) {
+    if ((quant == "fp16" or quant == "int8") && builder->platformHasFastFp16()) {
         config->setFlag(nvinfer1::BuilderFlag::kFP16); // fp16
+    }
+    std::unique_ptr<IInt8Calibrator> calibrator;
+    if (quant == "int8" && builder->platformHasFastInt8()) {
+        config->setFlag(nvinfer1::BuilderFlag::kINT8); //int8
+        int batchsize = 32;
+        int n_cal_batches = -1;
+        string cal_table_name = "calibrate_int8";
+        string input_name = "input_image";
+
+        Dims indim = network->getInput(0)->getDimensions();
+        BatchStream calibrationStream(
+                batchsize, n_cal_batches, indim,
+                data_root, data_file);
+        calibrator.reset(new Int8EntropyCalibrator2<BatchStream>(
+            calibrationStream, 0, cal_table_name.c_str(), input_name.c_str()));
+        config->setInt8Calibrator(calibrator.get());
     }
 
     auto output = network->getOutput(0);

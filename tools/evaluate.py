@@ -89,7 +89,8 @@ class Metrics(object):
         fns = confusion.sum(dim=1) - tps
 
         # iou and fw miou
-        ious = confusion.diag() / (confusion.sum(dim=0) + confusion.sum(dim=1) - confusion.diag() + 1)
+        #  ious = confusion.diag() / (confusion.sum(dim=0) + confusion.sum(dim=1) - confusion.diag() + 1)
+        ious = tps / (tps + fps + fns + 1)
         miou = ious.nanmean()
         fw_miou = torch.sum(weights * ious)
 

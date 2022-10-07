@@ -54,7 +54,8 @@ extern Logger gLogger;
 
 
 TrtSharedEnginePtr shared_engine_ptr(ICudaEngine* ptr);
-TrtSharedEnginePtr parse_to_engine(string onnx_path, bool use_fp16);
+TrtSharedEnginePtr parse_to_engine(string onnx_path, string quant, 
+        string data_root, string data_file);
 void serialize(TrtSharedEnginePtr engine, string save_path);
 TrtSharedEnginePtr deserialize(string serpth);
 vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data);

@@ -15,6 +15,7 @@
 #include <random>
 
 #include "trt_dep.hpp"
+#include "read_img.hpp"
 
 
 using nvinfer1::IHostMemory;
@@ -62,7 +63,8 @@ int main(int argc, char* argv[]) {
 
     if (args[0] == "compile") {
         if (argc < 4) {
-            cout << "usage is: ./segment compile input.onnx output.trt [--fp16]\n";
+            cout << "usage is: ./segment compile input.onnx output.trt [--fp16|--fp32]\n";
+            cout << "or ./segment compile input.onnx output.trt --int8 /path/to/data_root /path/to/ann_file\n";
             std::abort();
         }
         compile_onnx(args);
@@ -85,10 +87,25 @@ int main(int argc, char* argv[]) {
 
 
 void compile_onnx(vector<string> args) {
-    bool use_fp16{false};
-    if ((args.size() >= 4) && args[3] == "--fp16") use_fp16 = true;
+    string quant("fp32");
+    string data_root("none");
+    string data_file("none");
+    if ((args.size() >= 4)) {
+        if (args[3] == "--fp32") {
+            quant = "fp32";
+        } else if (args[3] == "--fp16") {
+            quant = "fp16";
+        } else if (args[3] == "--int8") {
+            quant = "int8";
+            data_root = args[4];
+            data_file = args[5];
+        } else {
+            cout << "invalid args of quantization: " << args[3] << endl; 
+            std::abort();
+        }
+    } 
 
-    TrtSharedEnginePtr engine = parse_to_engine(args[1], use_fp16);
+    TrtSharedEnginePtr engine = parse_to_engine(args[1], quant, data_root, data_file);
     serialize(engine, args[2]);
 }
 
@@ -105,36 +122,9 @@ void run_with_trt(vector<string> args) {
     const int oH{o_dims.d[2]}, oW{o_dims.d[3]};
 
     // prepare image and resize
-    Mat im = cv::imread(args[2]);
-    if (im.empty()) {
-        cout << "cannot read image \n";
-        std::abort();
-    }
-    // CHECK (!im.empty()) << "cannot read image \n";
-    int orgH{im.rows}, orgW{im.cols};
-    if ((orgH != iH) || orgW != iW) {
-        cout << "resize orignal image of (" << orgH << "," << orgW 
-            << ") to (" << iH << ", " << iW << ") according to model require\n";
-        cv::resize(im, im, cv::Size(iW, iH), cv::INTER_CUBIC);
-    }
-
-    // normalize and convert to rgb
-    array<float, 3> mean{0.485f, 0.456f, 0.406f};
-    array<float, 3> variance{0.229f, 0.224f, 0.225f};
-    float scale = 1.f / 255.f;
-    for (int i{0}; i < 3; ++ i) {
-        variance[i] = 1.f / variance[i];
-    }
-    vector<float> data(iH * iW * 3);
-    for (int h{0}; h < iH; ++h) {
-        cv::Vec3b *p = im.ptr<cv::Vec3b>(h);
-        for (int w{0}; w < iW; ++w) {
-            for (int c{0}; c < 3; ++c) {
-                int idx = (2 - c) * iH * iW + h * iW + w; // to rgb order
-                data[idx] = (p[w][c] * scale - mean[c]) * variance[c];
-            }
-        }
-    }
+    vector<float> data; data.resize(iH * iW * 3);
+    int orgH, orgW;
+    read_data(args[2], &data[0], iH, iW, orgH, orgW);
 
     // call engine
     vector<int> res = infer_with_engine(engine, data);
@@ -155,11 +145,10 @@ void run_with_trt(vector<string> args) {
     }
 
     // resize back and save
-    if ((orgH != oH) || orgW != oW) {
+    if ((orgH != oH) || (orgW != oW)) {
         cv::resize(pred, pred, cv::Size(orgW, orgH), cv::INTER_CUBIC);
     }
     cv::imwrite(args[3], pred);
-
 }
 
 
