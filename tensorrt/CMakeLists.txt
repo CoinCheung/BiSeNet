@@ -10,8 +10,6 @@ link_directories(/usr/local/cuda/lib64)
 link_directories(${PROJECT_SOURCE_DIR}/build)
 # include_directories(/root/build/TensorRT-8.2.5.1/include)
 # link_directories(/root/build/TensorRT-8.2.5.1/lib)
-include_directories(/data/zzy/trt_install/TensorRT-8.2.5.1/include)
-link_directories(/data/zzy/trt_install/TensorRT-8.2.5.1/lib)
 
 
 find_package(CUDA REQUIRED)

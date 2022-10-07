@@ -80,7 +80,7 @@ public:
         cudaError_t state;
         state = cudaMemcpy(mDeviceInput, mStream.getBatch(), mInputCount * sizeof(float), cudaMemcpyHostToDevice);
         if (state) {
-            cout << "allocate memory failed\n"; 
+            cout << "memory copy to device failed\n"; 
             std::abort();
         }
         assert(!strcmp(names[0], mInputBlobName));
