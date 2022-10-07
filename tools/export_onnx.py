@@ -38,5 +38,5 @@ output_names = ['preds',]
 
 torch.onnx.export(net, dummy_input, args.out_pth,
     input_names=input_names, output_names=output_names,
-    verbose=False, opset_version=11)
+    verbose=False, opset_version=11, )
 
