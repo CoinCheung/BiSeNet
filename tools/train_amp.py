@@ -8,6 +8,7 @@ import os.path as osp
 import random
 import logging
 import time
+import json
 import argparse
 import numpy as np
 from tabulate import tabulate
@@ -55,7 +56,10 @@ def set_model(lb_ignore=255):
     net = model_factory[cfg.model_type](cfg.n_cats)
     if not args.finetune_from is None:
         logger.info(f'load pretrained weights from {args.finetune_from}')
-        net.load_state_dict(torch.load(args.finetune_from, map_location='cpu'))
+        msg = net.load_state_dict(torch.load(args.finetune_from,
+            map_location='cpu'), strict=False)
+        logger.info('\tmissing keys: ' + json.dumps(msg.missing_keys))
+        logger.info('\tunexpected keys: ' + json.dumps(msg.unexpected_keys))
     if cfg.use_sync_bn: net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
     net.cuda()
     net.train()

@@ -51,14 +51,17 @@ void inference() {
     mod.opt.use_vulkan_compute = 1;
     mod.set_vulkan_device(1);
 #endif 
-    mod.load_param(mod_param.c_str());
-    mod.load_model(mod_model.c_str());
     // ncnn enable fp16 by default, so we do not need these options
     // int8 depends on the model itself, so we do not set here
     // bool use_fp16 = false;
     // mod.opt.use_fp16_packed = use_fp16;
     // mod.opt.use_fp16_storage = use_fp16;
     // mod.opt.use_fp16_arithmetic = use_fp16;
+    mod.opt.use_winograd_convolution = true;
+
+    // we should set opt before load model
+    mod.load_param(mod_param.c_str());
+    mod.load_model(mod_model.c_str());
 
     // load image, and copy to ncnn mat
     cv::Mat im = cv::imread(impth);
