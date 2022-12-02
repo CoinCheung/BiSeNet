@@ -20,7 +20,7 @@ Then we can use either c++ or python to compile the model and run inference.
 * ubuntu 18.04
 * nvidia Tesla T4 gpu, driver newer than 450.80
 * cuda 11.3, cudnn 8
-* cmake 3.17.1
+* cmake 3.22.0
 * opencv built from source
 * tensorrt 8.2.5.1
 
@@ -49,7 +49,7 @@ $ ./segment compile /path/to/onnx.model /path/to/saved_model.trt --fp16
 ```
 Building an int8 engine is also supported. Firstly, you should make sure your gpu support int8 inference, or you model will not be faster than fp16/fp32. Then you should prepare certain amount of images for int8 calibration. In this example, I use train set of cityscapes for calibration. The command is like this:  
 ```
-$ calibrate_int8 # delete this if exists
+$ rm calibrate_int8 # delete this if exists
 $ ./segment compile /path/to/onnx.model /path/to/saved_model.trt --int8 /path/to/BiSeNet/datasets/cityscapes /path/to/BiSeNet/datasets/cityscapes/train.txt
 ```
 With the above commands, we will have an tensorrt engine named `saved_model.trt` generated.  
