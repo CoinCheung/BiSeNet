@@ -117,7 +117,9 @@ pretrained/*
 run.sh
 openvino/build/*
 openvino/output*
+ncnn/models/*
 *.onnx
 tis/cpp_client/build/*
+log*txt
 
 tvm/

@@ -8,6 +8,7 @@ import torch.utils.model_zoo as modelzoo
 
 resnet18_url = 'https://download.pytorch.org/models/resnet18-5c106cde.pth'
 
+
 from torch.nn import BatchNorm2d
 
 
