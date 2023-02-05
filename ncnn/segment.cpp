@@ -51,12 +51,16 @@ void inference() {
     mod.opt.use_vulkan_compute = 1;
     mod.set_vulkan_device(1);
 #endif 
-    // ncnn enable fp16 by default, so we do not need these options
-    // int8 depends on the model itself, so we do not set here
+    //// switch off fp16
     // bool use_fp16 = false;
     // mod.opt.use_fp16_packed = use_fp16;
     // mod.opt.use_fp16_storage = use_fp16;
     // mod.opt.use_fp16_arithmetic = use_fp16;
+    //// switch on bf16
+    // mod.opt.use_packing_layout = true;
+    // mod.opt.use_ff16_storage = true;
+    //// reduce cpu usage
+    // net.opt.openmp_blocktime = 0; 
     mod.opt.use_winograd_convolution = true;
 
     // we should set opt before load model
@@ -78,7 +82,7 @@ void inference() {
 
     // set input, run, get output
     ncnn::Extractor ex = mod.create_extractor();
-    ex.set_light_mode(true); // not sure what this mean
+    ex.set_light_mode(true); 
     ex.set_num_threads(nthreads);
 #if NCNN_VULKAN
     ex.set_vulkan_compute(true);
