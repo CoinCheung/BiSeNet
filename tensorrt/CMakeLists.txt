@@ -2,8 +2,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.17)
 
 PROJECT(segment)
 
-set(CMAKE_CXX_FLAGS "-std=c++14 -O2")
-set(CMAKE_NVCC_FLAGS "-std=c++14 -O2")
+set(CMAKE_CXX_FLAGS "-std=c++17 -O2")
+set(CMAKE_NVCC_FLAGS "-std=c++20 -O2")
 
 
 link_directories(/usr/local/cuda/lib64)
@@ -21,7 +21,7 @@ add_executable(segment segment.cpp trt_dep.cpp read_img.cpp)
 target_include_directories(
     segment PUBLIC ${CUDA_INCLUDE_DIRS} ${CUDNN_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(
-    segment -lnvinfer -lnvinfer_plugin -lnvparsers -lnvonnxparser -lkernels
+    segment -lnvinfer -lnvinfer_plugin -lnvonnxparser -lkernels
     ${CUDA_LIBRARIES}
     ${OpenCV_LIBRARIES})
 

@@ -6,8 +6,8 @@ My implementation of [BiSeNetV1](https://arxiv.org/abs/1808.00897) and [BiSeNetV
 mIOUs and fps on cityscapes val set:
 | none | ss | ssc | msf | mscf | fps(fp32/fp16/int8) | link |
 |------|:--:|:---:|:---:|:----:|:---:|:----:|
-| bisenetv1 | 75.44 | 76.94 | 77.45 | 78.86 | 25/78/141 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_city_new.pth) |
-| bisenetv2 | 74.95 | 75.58 | 76.53 | 77.08 | 26/67/95 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_city.pth) |
+| bisenetv1 | 75.44 | 76.94 | 77.45 | 78.86 | 112/239/435 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_city_new.pth) |
+| bisenetv2 | 74.95 | 75.58 | 76.53 | 77.08 | 103/161/198 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_city.pth) |
 
 mIOUs on cocostuff val2017 set:
 | none | ss | ssc | msf | mscf | link |

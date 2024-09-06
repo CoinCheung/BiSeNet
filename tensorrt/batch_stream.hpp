@@ -52,7 +52,6 @@ public:
 
     void reset(int firstBatch) override
     {
-        cout << "mBatchCount: " << mBatchCount << endl;
         mBatchCount = firstBatch;
     }
 
