@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <sstream>
 #include <chrono>
+#include <iterator>
 
 #include "trt_dep.hpp"
 #include "batch_stream.hpp"
@@ -23,8 +24,9 @@ using nvinfer1::IBuilderConfig;
 using nvinfer1::IRuntime;
 using nvinfer1::IExecutionContext;
 using nvinfer1::ILogger;
-using nvinfer1::Dims3;
-using nvinfer1::Dims2;
+using nvinfer1::Dims;
+using nvinfer1::Dims4;
+using nvinfer1::OptProfileSelector;
 using Severity = nvinfer1::ILogger::Severity;
 
 using std::string;
@@ -40,114 +42,123 @@ using std::array;
 Logger gLogger;
 
 
-TrtSharedEnginePtr shared_engine_ptr(ICudaEngine* ptr) {
-    return TrtSharedEnginePtr(ptr, TrtDeleter());
+
+void CHECK(bool state, string msg) {
+    if (!state) {
+        cout << msg << endl;;
+        std::terminate();
+    }
 }
 
 
-TrtSharedEnginePtr parse_to_engine(string onnx_pth, 
+
+void SemanticSegmentTrt::parse_to_engine(string onnx_pth, 
         string quant, string data_root, string data_file) {
-    unsigned int maxBatchSize{1};
-    long memory_limit = 1UL << 32; // 4G
 
     auto builder = TrtUnqPtr<IBuilder>(nvinfer1::createInferBuilder(gLogger));
-    if (!builder) {
-        cout << "create builder failed\n";
-        std::abort();
-    }
+    CHECK(static_cast<bool>(builder), "create builder failed");
 
-    const auto explicitBatch = 1U << static_cast<uint32_t>(
-            nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
     auto network = TrtUnqPtr<INetworkDefinition>(
-            builder->createNetworkV2(explicitBatch));
-    if (!network) {
-        cout << "create network failed\n";
-        std::abort();
-    }
-
-    auto config = TrtUnqPtr<IBuilderConfig>(builder->createBuilderConfig());
-    if (!config) {
-        cout << "create builder config failed\n";
-        std::abort();
-    }
+            builder->createNetworkV2(0));
+    CHECK(static_cast<bool>(network), "create network failed");
 
     auto parser = TrtUnqPtr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, gLogger));
-    if (!parser) {
-        cout << "create parser failed\n";
-        std::abort();
-    }
+    CHECK(static_cast<bool>(parser), "create parser failed");
 
     int verbosity = (int)nvinfer1::ILogger::Severity::kWARNING;
-    bool state = parser->parseFromFile(onnx_pth.c_str(), verbosity);
-    if (!state) {
-        cout << "parse model failed\n";
-        std::abort();
-    }
+    bool success = parser->parseFromFile(onnx_pth.c_str(), verbosity);
+    CHECK(success, "parse onnx file failed");
 
-    config->setMaxWorkspaceSize(memory_limit);
-    if ((quant == "fp16" or quant == "int8") && builder->platformHasFastFp16()) {
-        config->setFlag(nvinfer1::BuilderFlag::kFP16); // fp16
+    if (network->getNbInputs() != 1) {
+        cout << "expect model to have only one input, but this model has " 
+            << network->getNbInputs() << endl;
+        std::terminate();
     }
-    std::unique_ptr<IInt8Calibrator> calibrator;
-    if (quant == "int8" && builder->platformHasFastInt8()) {
-        config->setFlag(nvinfer1::BuilderFlag::kINT8); //int8
-        int batchsize = 32;
-        int n_cal_batches = -1;
-        string cal_table_name = "calibrate_int8";
-        string input_name = "input_image";
-
-        Dims indim = network->getInput(0)->getDimensions();
-        BatchStream calibrationStream(
-                batchsize, n_cal_batches, indim,
-                data_root, data_file);
-        calibrator.reset(new Int8EntropyCalibrator2<BatchStream>(
-            calibrationStream, 0, cal_table_name.c_str(), input_name.c_str()));
-        config->setInt8Calibrator(calibrator.get());
-    }
-
+    auto input = network->getInput(0);
     auto output = network->getOutput(0);
+    input_name = input->getName();
+    output_name = output->getName();
+
+    auto config = TrtUnqPtr<IBuilderConfig>(builder->createBuilderConfig());
+    CHECK(static_cast<bool>(config), "create builder config failed");
+
+    config->setProfileStream(*stream);
+
+    auto profile = builder->createOptimizationProfile();
+    Dims in_dims = network->getInput(0)->getDimensions();
+    int32_t C = in_dims.d[1], H = in_dims.d[2], W = in_dims.d[3];
+    Dims dmin = Dims4{1, C, H, W};
+    Dims dopt = Dims4{opt_bsize, C, H, W};
+    Dims dmax = Dims4{32, C, H, W};
+    profile->setDimensions(input->getName(), OptProfileSelector::kMIN, dmin);
+    profile->setDimensions(input->getName(), OptProfileSelector::kOPT, dopt);
+    profile->setDimensions(input->getName(), OptProfileSelector::kMAX, dmax);
+    config->addOptimizationProfile(profile);
+
+    if (quant == "fp16") { // fp16
+        if (builder->platformHasFastFp16() == false) {
+            cout << "fp16 is set, but platform does not support, so we ignore this\n";
+        } else {
+            config->setFlag(nvinfer1::BuilderFlag::kFP16); 
+        }
+    }
+    if (quant == "bf16") { // bf16
+        config->setFlag(nvinfer1::BuilderFlag::kBF16); 
+    }
+    if (quant == "fp8") { // fp8
+        config->setFlag(nvinfer1::BuilderFlag::kFP8); 
+    }
+
+    std::unique_ptr<IInt8Calibrator> calibrator;
+    if (quant == "int8") { // int8
+        if (builder->platformHasFastInt8() == false) {
+            cout << "int8 is set, but platform does not support, so we ignore this\n";
+        } else {
+
+            int batchsize = 32;
+            int n_cal_batches = -1;
+            string cal_table_name = "calibrate_int8";
+
+            Dims indim = network->getInput(0)->getDimensions();
+            BatchStream calibrationStream(
+                    batchsize, n_cal_batches, indim,
+                    data_root, data_file);
+
+            config->setFlag(nvinfer1::BuilderFlag::kINT8); 
+
+            calibrator.reset(new Int8EntropyCalibrator2<BatchStream>(
+                calibrationStream, 0, cal_table_name.c_str(), input_name.c_str(), false));
+            config->setInt8Calibrator(calibrator.get());
+        }
+    }
+
     // output->setType(nvinfer1::DataType::kINT32);
     output->setType(nvinfer1::DataType::kFLOAT);
 
-    cout << " start to build \n";
-    CudaStreamUnqPtr stream(new cudaStream_t);
-    if (cudaStreamCreate(stream.get())) {
-        cout << "create stream failed\n";
-        std::abort();
-    }
-    config->setProfileStream(*stream);
+    cout << "start to build \n";
 
     auto plan = TrtUnqPtr<IHostMemory>(builder->buildSerializedNetwork(*network, *config));
-    if (!plan) {
-        cout << "serialization failed\n";
-        std::abort();
-    }
+    CHECK(static_cast<bool>(plan), "build serialized engine failed");
 
-    auto runtime = TrtUnqPtr<IRuntime>(nvinfer1::createInferRuntime(gLogger));
-    if (!plan) {
-        cout << "create runtime failed\n";
-        std::abort();
-    }
+    runtime.reset(nvinfer1::createInferRuntime(gLogger));
+    CHECK(static_cast<bool>(runtime), "create runtime failed");
 
-    TrtSharedEnginePtr engine = shared_engine_ptr(
-            runtime->deserializeCudaEngine(plan->data(), plan->size()));
-    if (!engine) {
-        cout << "create engine failed\n";
-        std::abort();
-    }
+    engine.reset(runtime->deserializeCudaEngine(plan->data(), plan->size()));
+    CHECK(static_cast<bool>(engine), "deserialize engine failed");
     cout << "done build engine \n";
-
-    return engine;
 }
 
 
-void serialize(TrtSharedEnginePtr engine, string save_path) {
+void SemanticSegmentTrt::set_opt_batch_size(int bs) {
+    CHECK(bs > 0 and bs < 33, "batch size should be less than 32");
+    opt_bsize = bs;
+}
+
+
+void SemanticSegmentTrt::serialize(string save_path) {
 
     auto trt_stream = TrtUnqPtr<IHostMemory>(engine->serialize());
-    if (!trt_stream) {
-        cout << "serialize engine failed\n";
-        std::abort();
-    }
+    CHECK(static_cast<bool>(trt_stream), "serialize engine failed");
 
     ofstream ofile(save_path, ios::out | ios::binary);
     ofile.write((const char*)trt_stream->data(), trt_stream->size());
@@ -156,13 +167,10 @@ void serialize(TrtSharedEnginePtr engine, string save_path) {
 }
 
 
-TrtSharedEnginePtr deserialize(string serpth) {
+void SemanticSegmentTrt::deserialize(string serpth) {
 
     ifstream ifile(serpth, ios::in | ios::binary);
-    if (!ifile) {
-        cout << "read serialized file failed\n";
-        std::abort();
-    }
+    CHECK(static_cast<bool>(ifile), "read serialized file failed");
 
     ifile.seekg(0, ios::end);
     const int mdsize = ifile.tellg();
@@ -173,72 +181,59 @@ TrtSharedEnginePtr deserialize(string serpth) {
     ifile.close();
     cout << "model size: " << mdsize << endl;
 
-    auto runtime = TrtUnqPtr<IRuntime>(nvinfer1::createInferRuntime(gLogger));
-    TrtSharedEnginePtr engine = shared_engine_ptr(
-            runtime->deserializeCudaEngine((void*)&buf[0], mdsize));
-    return engine;
+    runtime.reset(nvinfer1::createInferRuntime(gLogger));
+    engine.reset(runtime->deserializeCudaEngine((void*)&buf[0], mdsize));
+
+    input_name = engine->getIOTensorName(0);
+    output_name = engine->getIOTensorName(1);
 }
 
 
-vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data) {
-    Dims3 out_dims = static_cast<Dims3&&>(
-        engine->getBindingDimensions(engine->getBindingIndex("preds")));
+vector<int> SemanticSegmentTrt::inference(vector<float>& data) {
+    Dims in_dims = engine->getTensorShape(input_name.c_str());
+    Dims out_dims = engine->getTensorShape(output_name.c_str());
 
-    const int batchsize{1}, H{out_dims.d[2]}, W{out_dims.d[3]};
-    const int n_classes{out_dims.d[1]};
-    const int in_size{static_cast<int>(data.size())};
-    const int logits_size{batchsize * n_classes * H * W};
-    const int out_size{batchsize * H * W};
+    const int64_t batchsize{1}, H{out_dims.d[2]}, W{out_dims.d[3]};
+    const int64_t n_classes{out_dims.d[1]};
+    const int64_t in_size{static_cast<int64_t>(data.size())};
+    const int64_t logits_size{batchsize * n_classes * H * W};
+    const int64_t out_size{batchsize * H * W};
+
+    Dims4 in_shape(batchsize, in_dims.d[1], in_dims.d[2], in_dims.d[3]);
+
     vector<void*> buffs(3);
     vector<int> res(out_size);
 
-    auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
-    if (!context) {
-        cout << "create execution context failed\n";
-        std::abort();
-    }
-
     cudaError_t state;
     state = cudaMalloc(&buffs[0], in_size * sizeof(float));
-    if (state) {
-        cout << "allocate memory failed\n";
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "allocate memory failed");
+
     state = cudaMalloc(&buffs[1], logits_size * sizeof(float));
-    if (state) {
-        cout << "allocate memory failed\n";
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "allocate memory failed");
+
     state = cudaMalloc(&buffs[2], out_size * sizeof(int));
-    if (state) {
-        cout << "allocate memory failed\n";
-        std::abort();
-    }
-    CudaStreamUnqPtr stream(new cudaStream_t);
-    if (cudaStreamCreate(stream.get())) {
-        cout << "create stream failed\n";
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "allocate memory failed");
 
     state = cudaMemcpyAsync(
             buffs[0], &data[0], in_size * sizeof(float),
             cudaMemcpyHostToDevice, *stream);
-    if (state) {
-        cout << "transmit to device failed\n";
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "transmit to device failed");
 
-    context->enqueueV2(&buffs[0], *stream, nullptr);
-    // context->enqueue(1, &buffs[0], stream, nullptr);
+    auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
+    CHECK(static_cast<bool>(context), "create execution context failed");
+
+    // Dynamic shape require this setInputShape
+    bool success = context->setInputShape(input_name.c_str(), in_shape);
+    CHECK(success, "set input shape failed");
+    context->setInputTensorAddress(input_name.c_str(), buffs[0]);
+    context->setOutputTensorAddress(output_name.c_str(), buffs[1]);
+    context->enqueueV3(*stream);
     argMaxFunc(buffs[1], buffs[2], batchsize, n_classes, H * W, stream.get());
 
     state = cudaMemcpyAsync(
             &res[0], buffs[2], out_size * sizeof(int),
             cudaMemcpyDeviceToHost, *stream);
-    if (state) {
-        cout << "transmit to host failed \n";
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "transmit back to host failed");
 
     cudaStreamSynchronize(*stream);
 
@@ -250,62 +245,67 @@ vector<int> infer_with_engine(TrtSharedEnginePtr engine, vector<float>& data) {
 }
 
 
-void test_fps_with_engine(TrtSharedEnginePtr engine) {
-    Dims3 in_dims = static_cast<Dims3&&>(
-        engine->getBindingDimensions(engine->getBindingIndex("input_image")));
-    Dims3 out_dims = static_cast<Dims3&&>(
-        engine->getBindingDimensions(engine->getBindingIndex("preds")));
+void SemanticSegmentTrt::test_speed_fps() {
+    Dims in_dims = engine->getTensorShape(input_name.c_str());
+    Dims out_dims = engine->getTensorShape(output_name.c_str());
 
-    const int batchsize{1};
-    const int oH{out_dims.d[2]}, oW{out_dims.d[3]};
-    const int n_classes{out_dims.d[1]};
-    const int iH{in_dims.d[2]}, iW{in_dims.d[3]};
-    const int in_size{batchsize * 3 * iH * iW};
-    const int logits_size{batchsize * n_classes * oH * oW};
-    const int out_size{batchsize * oH * oW};
+    const int batchsize{opt_bsize};
+    const int64_t oH{out_dims.d[2]}, oW{out_dims.d[3]};
+    const int64_t n_classes{out_dims.d[1]};
+    const int64_t iH{in_dims.d[2]}, iW{in_dims.d[3]};
+    const int64_t in_size{batchsize * 3 * iH * iW};
+    const int64_t logits_size{batchsize * n_classes * oH * oW};
+    const int64_t out_size{batchsize * oH * oW};
 
-    auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
-    if (!context) {
-        cout << "create execution context failed\n";
-        std::abort();
-    }
+    Dims4 in_shape(batchsize, in_dims.d[1], in_dims.d[2], in_dims.d[3]);
 
     vector<void*> buffs(3);
     cudaError_t state;
     state = cudaMalloc(&buffs[0], in_size * sizeof(float));
-    if (state) {
-        cout << "allocate memory failed\n"; 
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "allocate memory failed");
     state = cudaMalloc(&buffs[1], logits_size * sizeof(float));
-    if (state) {
-        cout << "allocate memory failed\n";
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "allocate memory failed");
     state = cudaMalloc(&buffs[2], out_size * sizeof(int));
-    if (state) {
-        cout << "allocate memory failed\n";
-        std::abort();
-    }
+    CHECK(state == cudaSuccess, "allocate memory failed");
 
-    cout << "\ntest with cropsize of (" << iH << ", " << iW << ") ...\n";
+    auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
+    CHECK(static_cast<bool>(context), "create execution context failed");
+    bool success = context->setInputShape(input_name.c_str(), in_shape);
+    CHECK(success, "set input shape failed");
+
+    cout << "\ntest with cropsize of (" << iH << ", " << iW << "), "
+        << "and batch size of " << batchsize << " ...\n";
     auto start = std::chrono::steady_clock::now();
-    const int n_loops{1000};
+    const int n_loops{2000};
     for (int i{0}; i < n_loops; ++i) {
-        // context->execute(1, &buffs[0]);
-        context->executeV2(&buffs[0]);
+        context->executeV2(buffs.data());
         argMaxFunc(buffs[1], buffs[2], batchsize, n_classes, oH * oW, nullptr);
     }
     auto end = std::chrono::steady_clock::now();
     double duration = std::chrono::duration<double, std::milli>(end - start).count();
     duration /= 1000.;
+    int n_frames = n_loops * batchsize;
     cout << "running " << n_loops << " times, use time: "
         << duration << "s" << endl; 
-    cout << "fps is: " << static_cast<double>(n_loops) / duration << endl;
-
+    cout << "fps is: " << static_cast<double>(n_frames) / duration << endl;
 
     cudaFree(buffs[0]);
     cudaFree(buffs[1]);
     cudaFree(buffs[2]);
 }
 
+
+vector<int> SemanticSegmentTrt::get_input_shape() {
+
+    Dims i_dims = engine->getTensorShape(input_name.c_str());
+    vector<int> res(i_dims.d, i_dims.d + 4);
+    return res;
+}
+
+
+vector<int> SemanticSegmentTrt::get_output_shape() {
+
+    Dims o_dims = engine->getTensorShape(output_name.c_str());
+    vector<int> res(o_dims.d, o_dims.d + 4);
+    return res;
+}

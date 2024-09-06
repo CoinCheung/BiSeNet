@@ -13,6 +13,7 @@
 #include <array>
 #include <sstream>
 #include <random>
+#include <unordered_map>
 
 #include "trt_dep.hpp"
 #include "read_img.hpp"
@@ -27,8 +28,7 @@ using nvinfer1::IBuilderConfig;
 using nvinfer1::IRuntime;
 using nvinfer1::IExecutionContext;
 using nvinfer1::ILogger;
-using nvinfer1::Dims3;
-using nvinfer1::Dims2;
+using nvinfer1::Dims;
 using Severity = nvinfer1::ILogger::Severity;
 
 using std::string;
@@ -39,6 +39,7 @@ using std::vector;
 using std::cout;
 using std::endl;
 using std::array;
+using std::stringstream;
 
 using cv::Mat;
 
@@ -53,33 +54,25 @@ void test_speed(vector<string> args);
 
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        cout << "usage is ./segment compile/run/test\n";
-        std::abort();
-    }
+    CHECK (argc >= 3, "usage is ./segment compile/run/test");
 
     vector<string> args;
     for (int i{1}; i < argc; ++i) args.emplace_back(argv[i]);
 
     if (args[0] == "compile") {
-        if (argc < 4) {
-            cout << "usage is: ./segment compile input.onnx output.trt [--fp16|--fp32]\n";
-            cout << "or ./segment compile input.onnx output.trt --int8 /path/to/data_root /path/to/ann_file\n";
-            std::abort();
-        }
+        stringstream ss;
+        ss << "usage is: ./segment compile input.onnx output.trt [--fp16|--fp32|--bf16|--fp8]\n"
+            << "or ./segment compile input.onnx output.trt --int8 /path/to/data_root /path/to/ann_file\n";
+        CHECK (argc >= 5, ss.str());
         compile_onnx(args);
     } else if (args[0] == "run") {
-        if (argc < 5) {
-            cout << "usage is ./segment run ./xxx.trt input.jpg result.jpg\n";
-            std::abort();
-        }
+        CHECK (argc >= 5, "usage is ./segment run ./xxx.trt input.jpg result.jpg");
         run_with_trt(args);
     } else if (args[0] == "test") {
-        if (argc < 3) {
-            cout << "usage is ./segment test ./xxx.trt\n";
-            std::abort();
-        }
+        CHECK (argc >= 3, "usage is ./segment test ./xxx.trt");
         test_speed(args);
+    } else {
+        CHECK (false, "usage is ./segment compile/run/test");
     }
 
     return 0;
@@ -87,39 +80,50 @@ int main(int argc, char* argv[]) {
 
 
 void compile_onnx(vector<string> args) {
+
     string quant("fp32");
     string data_root("none");
     string data_file("none");
-    if ((args.size() >= 4)) {
-        if (args[3] == "--fp32") {
-            quant = "fp32";
-        } else if (args[3] == "--fp16") {
-            quant = "fp16";
-        } else if (args[3] == "--int8") {
-            quant = "int8";
-            data_root = args[4];
-            data_file = args[5];
-        } else {
-            cout << "invalid args of quantization: " << args[3] << endl; 
-            std::abort();
-        }
-    } 
+    int opt_bsize = 1;
 
-    TrtSharedEnginePtr engine = parse_to_engine(args[1], quant, data_root, data_file);
-    serialize(engine, args[2]);
+    std::unordered_map<string, string> quant_map{
+        {"--fp32", "fp32"},
+        {"--fp16", "fp16"},
+        {"--bf16", "bf16"},
+        {"--fp8",  "fp8"},
+        {"--int8", "int8"},
+    };
+    CHECK (quant_map.find(args[3]) != quant_map.end(),
+        "invalid args of quantization: " + args[3]); 
+    quant = quant_map[args[3]];
+    if (quant == "int8") {
+        data_root = args[4];
+        data_file = args[5];
+    }
+
+    if (args[3] == "--int8") {
+        if (args.size() > 6) opt_bsize = std::stoi(args[6]);
+    } else {
+        if (args.size() > 4) opt_bsize = std::stoi(args[4]);
+    }
+
+    SemanticSegmentTrt ss_trt;
+    ss_trt.set_opt_batch_size(opt_bsize);
+    ss_trt.parse_to_engine(args[1], quant, data_root, data_file);
+    ss_trt.serialize(args[2]);
 }
 
 
 void run_with_trt(vector<string> args) {
 
-    TrtSharedEnginePtr engine = deserialize(args[1]);
+    SemanticSegmentTrt ss_trt;
+    ss_trt.deserialize(args[1]);
 
-    Dims3 i_dims = static_cast<Dims3&&>(
-        engine->getBindingDimensions(engine->getBindingIndex("input_image")));
-    Dims3 o_dims = static_cast<Dims3&&>(
-        engine->getBindingDimensions(engine->getBindingIndex("preds")));
-    const int iH{i_dims.d[2]}, iW{i_dims.d[3]};
-    const int oH{o_dims.d[2]}, oW{o_dims.d[3]};
+    vector<int> i_dims = ss_trt.get_input_shape();
+    vector<int> o_dims = ss_trt.get_output_shape();
+
+    const int iH{i_dims[2]}, iW{i_dims[3]};
+    const int oH{o_dims[2]}, oW{o_dims[3]};
 
     // prepare image and resize
     vector<float> data; data.resize(iH * iW * 3);
@@ -127,7 +131,7 @@ void run_with_trt(vector<string> args) {
     read_data(args[2], &data[0], iH, iW, orgH, orgW);
 
     // call engine
-    vector<int> res = infer_with_engine(engine, data);
+    vector<int> res = ss_trt.inference(data);
 
     // generate colored out
     vector<vector<uint8_t>> color_map = get_color_map();
@@ -166,6 +170,11 @@ vector<vector<uint8_t>> get_color_map() {
 
 
 void test_speed(vector<string> args) {
-    TrtSharedEnginePtr engine = deserialize(args[1]);
-    test_fps_with_engine(engine);
+    int opt_bsize = 1;
+    if (args.size() > 2) opt_bsize = std::stoi(args[2]);
+
+    SemanticSegmentTrt ss_trt;
+    ss_trt.set_opt_batch_size(opt_bsize);
+    ss_trt.deserialize(args[1]);
+    ss_trt.test_speed_fps();
 }
