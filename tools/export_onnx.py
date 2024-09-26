@@ -35,8 +35,10 @@ net.eval()
 dummy_input = torch.randn(1, 3, 1024, 2048)
 input_names = ['input_image']
 output_names = ['preds',]
+dynamic_axes = {'input_image': {0: 'batch'}, 'preds': {0: 'batch'}}
 
 torch.onnx.export(net, dummy_input, args.out_pth,
     input_names=input_names, output_names=output_names,
-    verbose=False, opset_version=11, )
+    verbose=False, opset_version=18,
+    dynamic_axes=dynamic_axes)
 

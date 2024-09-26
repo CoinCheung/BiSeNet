@@ -95,7 +95,7 @@ void SemanticSegmentTrt::parse_to_engine(string onnx_pth,
     profile->setDimensions(input->getName(), OptProfileSelector::kMAX, dmax);
     config->addOptimizationProfile(profile);
 
-    if (quant == "fp16") { // fp16
+    if (quant == "fp16" or quant == "int8") { // fp16
         if (builder->platformHasFastFp16() == false) {
             cout << "fp16 is set, but platform does not support, so we ignore this\n";
         } else {
@@ -275,6 +275,7 @@ void SemanticSegmentTrt::test_speed_fps() {
 
     cout << "\ntest with cropsize of (" << iH << ", " << iW << "), "
         << "and batch size of " << batchsize << " ...\n";
+    context->executeV2(buffs.data()); // run one batch ahead
     auto start = std::chrono::steady_clock::now();
     const int n_loops{2000};
     for (int i{0}; i < n_loops; ++i) {
