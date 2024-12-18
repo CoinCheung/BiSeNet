@@ -26,7 +26,7 @@ from evaluate import eval_model
 from lib.ohem_ce_loss import OhemCELoss
 from lib.lr_scheduler import WarmupPolyLrScheduler
 from lib.meters import TimeMeter, AvgMeter
-from lib.logger import setup_logger, print_log_msg
+from lib.logger import setup_logger, log_msg
 
 
 
@@ -174,9 +174,10 @@ def train():
         if (it + 1) % 100 == 0:
             lr = lr_schdr.get_lr()
             lr = sum(lr) / len(lr)
-            print_log_msg(
+            msg = log_msg(
                 it, cfg.max_iter, lr, time_meter, loss_meter,
                 loss_pre_meter, loss_aux_meters)
+            logger.info(msg)
         lr_schdr.step()
 
     ## dump the final model and evaluate the result

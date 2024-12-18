@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, '.')
 
 import torch
+from torch.onnx import OperatorExportTypes
 
 from lib.models import model_factory
 from configs import set_cfg_from_file
@@ -27,7 +28,8 @@ cfg = set_cfg_from_file(args.config)
 if cfg.use_sync_bn: cfg.use_sync_bn = False
 
 net = model_factory[cfg.model_type](cfg.n_cats, aux_mode=args.aux_mode)
-net.load_state_dict(torch.load(args.weight_pth, map_location='cpu'), strict=False)
+net.load_state_dict(torch.load(args.weight_pth, map_location='cpu',
+                               weights_only=True), strict=False)
 net.eval()
 
 
@@ -40,5 +42,6 @@ dynamic_axes = {'input_image': {0: 'batch'}, 'preds': {0: 'batch'}}
 torch.onnx.export(net, dummy_input, args.out_pth,
     input_names=input_names, output_names=output_names,
     verbose=False, opset_version=18,
+    operator_export_type=OperatorExportTypes.ONNX_FALLTHROUGH,
     dynamic_axes=dynamic_axes)
 

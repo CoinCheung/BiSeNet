@@ -1,4 +1,7 @@
 
+#ifndef _KERNELS_HPP_
+#define _KERNELS_HPP_
+
 #include <iostream>
 #include <functional>
 #include <algorithm>
@@ -11,10 +14,29 @@
 
 
 
-#define BLOCKSIZE 512
+#define BLOCKSIZE 256
 
 #define ivpair thrust::pair<scalar_t, int>
 
+// __device__ __forceinline__
+// bool operator<(const __half a, const __half b) {
+//     return __hlt(a, b);
+// }
+//
+// __device__ __forceinline__
+// bool operator<=(const __half a, const __half b) {
+//     return __hle(a, b);
+// }
+//
+// __device__ __forceinline__
+// bool operator>(const __half a, const __half b) {
+//     return __hgt(a, b);
+// }
+//
+// __device__ __forceinline__
+// bool operator>=(const __half a, const __half b) {
+//     return __hge(a, b);
+// }
 
 template<typename scalar_t>
 __forceinline__ __device__ void reduce_max(ivpair* sdata, int blocksize, int tid) {
@@ -34,7 +56,7 @@ template<typename scalar_t>
 __global__ void arg_max_depth(const int n_size,
                             const int dimsize, const int m_size,
                             const scalar_t *inten,
-                            int *oten) {
+                            int64_t *oten) {
     extern __shared__ __align__(sizeof(ivpair)) unsigned char sdata_raw[];
     ivpair *sdata = reinterpret_cast<ivpair*>(sdata_raw);
     sdata = sdata + blockDim.x * threadIdx.y;
@@ -72,7 +94,7 @@ template<typename scalar_t>
 __global__ void arg_max_spatial(const int n_size,
                             const int dimsize, const int m_size,
                             const scalar_t *inten,
-                            int *oten) {
+                            int64_t *oten) {
 
     int sample_offset = gridDim.x * blockDim.x;
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -100,38 +122,35 @@ __global__ void arg_max_spatial(const int n_size,
 }
 
 
-void argMaxFunc(const void *inten,
-                void *oten, const int n_size,
+template<typename scalar_t>
+void argMaxFunc(const scalar_t *inten,
+                int64_t *oten, const int n_size,
                 const int dimsize, const int m_size,
                 cudaStream_t* stream) {
-    if (inten == nullptr or oten == nullptr) std::abort();
+
+    if (inten == nullptr or oten == nullptr) std::terminate();
 
     int samplesize = n_size * m_size;
-    int shm_size = 0;
     dim3 grid, block;
 
     if (dimsize <= 256) {
         int blockx, gridx;
         cudaOccupancyMaxPotentialBlockSize(&gridx, &blockx,
-                arg_max_spatial<float>, 0, samplesize);
+                arg_max_spatial<scalar_t>, 0, samplesize);
         gridx = std::min(4096, gridx << 2);
         block.x = blockx; grid.x = gridx;
 
         if (stream == nullptr) {
-            arg_max_spatial<float><<<grid, block, shm_size>>>(
-                    n_size, dimsize, m_size,
-                    reinterpret_cast<const float*>(inten),
-                    reinterpret_cast<int*>(oten));
+            arg_max_spatial<scalar_t><<<grid, block, 0>>>(
+                    n_size, dimsize, m_size, inten, oten);
         } else {
-            arg_max_spatial<float><<<grid, block, shm_size, *stream>>>(
-                    n_size, dimsize, m_size,
-                    reinterpret_cast<const float*>(inten),
-                    reinterpret_cast<int*>(oten));
+            arg_max_spatial<scalar_t><<<grid, block, 0, *stream>>>(
+                    n_size, dimsize, m_size, inten, oten);
         }
 
     } else {
         int blockx, blocky, gridx;
-        shm_size = (sizeof(float) + sizeof(int)) * BLOCKSIZE;
+        int shm_size = (sizeof(scalar_t) + sizeof(int)) * BLOCKSIZE;
         int block_lmt = std::min(BLOCKSIZE, dimsize);
         blockx = 32;
         while (blockx <= block_lmt) blockx = (blockx << 1);
@@ -141,18 +160,13 @@ void argMaxFunc(const void *inten,
         block.x = blockx; block.y = blocky; grid.x = gridx;
 
         if (stream == nullptr) {
-            arg_max_depth<float><<<grid, block, shm_size>>>(
-                    n_size, dimsize, m_size,
-                    reinterpret_cast<const float*>(inten),
-                    reinterpret_cast<int*>(oten));
+            arg_max_depth<scalar_t><<<grid, block, shm_size>>>(
+                    n_size, dimsize, m_size, inten, oten);
         } else {
-            arg_max_depth<float><<<grid, block, shm_size, *stream>>>(
-                    n_size, dimsize, m_size,
-                    reinterpret_cast<const float*>(inten),
-                    reinterpret_cast<int*>(oten));
+            arg_max_depth<scalar_t><<<grid, block, shm_size, *stream>>>(
+                    n_size, dimsize, m_size, inten, oten);
         }
     }
-
-
 }
 
+#endif

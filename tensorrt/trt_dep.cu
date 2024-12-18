@@ -10,9 +10,9 @@
 #include <iterator>
 
 #include "trt_dep.hpp"
+#include "argmax_plugin.h"
 #include "batch_stream.hpp"
 #include "entropy_calibrator.hpp"
-#include "kernels.hpp"
 
 
 using nvinfer1::IHostMemory;
@@ -43,8 +43,8 @@ Logger gLogger;
 
 
 
-void CHECK(bool state, string msg) {
-    if (!state) {
+void CHECK(bool condition, string msg) {
+    if (!condition) {
         cout << msg << endl;;
         std::terminate();
     }
@@ -55,11 +55,15 @@ void CHECK(bool state, string msg) {
 void SemanticSegmentTrt::parse_to_engine(string onnx_pth, 
         string quant, string data_root, string data_file) {
 
+    std::unique_ptr<ArgMaxPluginCreator> plugin_creator{new ArgMaxPluginCreator{}};
+    plugin_creator->setPluginNamespace("");
+    bool status = getPluginRegistry()->registerCreator(*plugin_creator.get(), "");
+    CHECK(status, "failed to register plugin");
+
     auto builder = TrtUnqPtr<IBuilder>(nvinfer1::createInferBuilder(gLogger));
     CHECK(static_cast<bool>(builder), "create builder failed");
 
-    auto network = TrtUnqPtr<INetworkDefinition>(
-            builder->createNetworkV2(0));
+    auto network = TrtUnqPtr<INetworkDefinition>(builder->createNetworkV2(0));
     CHECK(static_cast<bool>(network), "create network failed");
 
     auto parser = TrtUnqPtr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, gLogger));
@@ -94,6 +98,8 @@ void SemanticSegmentTrt::parse_to_engine(string onnx_pth,
     profile->setDimensions(input->getName(), OptProfileSelector::kOPT, dopt);
     profile->setDimensions(input->getName(), OptProfileSelector::kMAX, dmax);
     config->addOptimizationProfile(profile);
+
+    config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 1UL << 32);
 
     if (quant == "fp16" or quant == "int8") { // fp16
         if (builder->platformHasFastFp16() == false) {
@@ -133,7 +139,7 @@ void SemanticSegmentTrt::parse_to_engine(string onnx_pth,
     }
 
     // output->setType(nvinfer1::DataType::kINT32);
-    output->setType(nvinfer1::DataType::kFLOAT);
+    // output->setType(nvinfer1::DataType::kFLOAT);
 
     cout << "start to build \n";
 
@@ -181,6 +187,11 @@ void SemanticSegmentTrt::deserialize(string serpth) {
     ifile.close();
     cout << "model size: " << mdsize << endl;
 
+    std::unique_ptr<ArgMaxPluginCreator> plugin_creator{new ArgMaxPluginCreator{}};
+    plugin_creator->setPluginNamespace("");
+    bool status = getPluginRegistry()->registerCreator(*plugin_creator.get(), "");
+    CHECK(status, "failed to register plugin");
+
     runtime.reset(nvinfer1::createInferRuntime(gLogger));
     engine.reset(runtime->deserializeCudaEngine((void*)&buf[0], mdsize));
 
@@ -189,29 +200,23 @@ void SemanticSegmentTrt::deserialize(string serpth) {
 }
 
 
-vector<int> SemanticSegmentTrt::inference(vector<float>& data) {
+vector<int64_t> SemanticSegmentTrt::inference(vector<float>& data) {
     Dims in_dims = engine->getTensorShape(input_name.c_str());
     Dims out_dims = engine->getTensorShape(output_name.c_str());
 
-    const int64_t batchsize{1}, H{out_dims.d[2]}, W{out_dims.d[3]};
-    const int64_t n_classes{out_dims.d[1]};
+    const int64_t batchsize{1}, H{out_dims.d[1]}, W{out_dims.d[2]};
     const int64_t in_size{static_cast<int64_t>(data.size())};
-    const int64_t logits_size{batchsize * n_classes * H * W};
     const int64_t out_size{batchsize * H * W};
 
     Dims4 in_shape(batchsize, in_dims.d[1], in_dims.d[2], in_dims.d[3]);
 
-    vector<void*> buffs(3);
-    vector<int> res(out_size);
+    vector<void*> buffs(2, nullptr);
+    vector<int64_t> res(out_size);
 
     cudaError_t state;
     state = cudaMalloc(&buffs[0], in_size * sizeof(float));
     CHECK(state == cudaSuccess, "allocate memory failed");
-
-    state = cudaMalloc(&buffs[1], logits_size * sizeof(float));
-    CHECK(state == cudaSuccess, "allocate memory failed");
-
-    state = cudaMalloc(&buffs[2], out_size * sizeof(int));
+    state = cudaMalloc(&buffs[1], out_size * sizeof(int64_t));
     CHECK(state == cudaSuccess, "allocate memory failed");
 
     state = cudaMemcpyAsync(
@@ -228,18 +233,17 @@ vector<int> SemanticSegmentTrt::inference(vector<float>& data) {
     context->setInputTensorAddress(input_name.c_str(), buffs[0]);
     context->setOutputTensorAddress(output_name.c_str(), buffs[1]);
     context->enqueueV3(*stream);
-    argMaxFunc(buffs[1], buffs[2], batchsize, n_classes, H * W, stream.get());
 
     state = cudaMemcpyAsync(
-            &res[0], buffs[2], out_size * sizeof(int),
+            &res[0], buffs[1], out_size * sizeof(int64_t),
             cudaMemcpyDeviceToHost, *stream);
     CHECK(state == cudaSuccess, "transmit back to host failed");
 
     cudaStreamSynchronize(*stream);
 
-    cudaFree(buffs[0]);
-    cudaFree(buffs[1]);
-    cudaFree(buffs[2]);
+    for (auto buf : buffs) {
+        cudaFree(buf);
+    }
 
     return res;
 }
@@ -249,23 +253,19 @@ void SemanticSegmentTrt::test_speed_fps() {
     Dims in_dims = engine->getTensorShape(input_name.c_str());
     Dims out_dims = engine->getTensorShape(output_name.c_str());
 
-    const int batchsize{opt_bsize};
-    const int64_t oH{out_dims.d[2]}, oW{out_dims.d[3]};
-    const int64_t n_classes{out_dims.d[1]};
+    const int64_t batchsize{opt_bsize};
+    const int64_t oH{out_dims.d[1]}, oW{out_dims.d[2]};
     const int64_t iH{in_dims.d[2]}, iW{in_dims.d[3]};
     const int64_t in_size{batchsize * 3 * iH * iW};
-    const int64_t logits_size{batchsize * n_classes * oH * oW};
     const int64_t out_size{batchsize * oH * oW};
 
     Dims4 in_shape(batchsize, in_dims.d[1], in_dims.d[2], in_dims.d[3]);
 
-    vector<void*> buffs(3);
+    vector<void*> buffs(2, nullptr);
     cudaError_t state;
     state = cudaMalloc(&buffs[0], in_size * sizeof(float));
     CHECK(state == cudaSuccess, "allocate memory failed");
-    state = cudaMalloc(&buffs[1], logits_size * sizeof(float));
-    CHECK(state == cudaSuccess, "allocate memory failed");
-    state = cudaMalloc(&buffs[2], out_size * sizeof(int));
+    state = cudaMalloc(&buffs[1], out_size * sizeof(int64_t));
     CHECK(state == cudaSuccess, "allocate memory failed");
 
     auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
@@ -280,7 +280,6 @@ void SemanticSegmentTrt::test_speed_fps() {
     const int n_loops{2000};
     for (int i{0}; i < n_loops; ++i) {
         context->executeV2(buffs.data());
-        argMaxFunc(buffs[1], buffs[2], batchsize, n_classes, oH * oW, nullptr);
     }
     auto end = std::chrono::steady_clock::now();
     double duration = std::chrono::duration<double, std::milli>(end - start).count();
@@ -290,16 +289,16 @@ void SemanticSegmentTrt::test_speed_fps() {
         << duration << "s" << endl; 
     cout << "fps is: " << static_cast<double>(n_frames) / duration << endl;
 
-    cudaFree(buffs[0]);
-    cudaFree(buffs[1]);
-    cudaFree(buffs[2]);
+    for (auto buf : buffs) {
+        cudaFree(buf);
+    }
 }
 
 
 vector<int> SemanticSegmentTrt::get_input_shape() {
 
     Dims i_dims = engine->getTensorShape(input_name.c_str());
-    vector<int> res(i_dims.d, i_dims.d + 4);
+    vector<int> res(i_dims.d, i_dims.d + i_dims.nbDims);
     return res;
 }
 
@@ -307,6 +306,6 @@ vector<int> SemanticSegmentTrt::get_input_shape() {
 vector<int> SemanticSegmentTrt::get_output_shape() {
 
     Dims o_dims = engine->getTensorShape(output_name.c_str());
-    vector<int> res(o_dims.d, o_dims.d + 4);
+    vector<int> res(o_dims.d, o_dims.d + o_dims.nbDims);
     return res;
 }

@@ -90,7 +90,7 @@ public:
     void parse_to_engine(string onnx_path, string quant, 
         string data_root, string data_file);
 
-    vector<int> inference(vector<float>& data);
+    vector<int64_t> inference(vector<float>& data);
 
     void test_speed_fps();
 
