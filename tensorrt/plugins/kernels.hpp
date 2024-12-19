@@ -6,7 +6,6 @@
 #include <functional>
 #include <algorithm>
 #include <cfloat>
-#include <thrust/pair.h>
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
@@ -17,21 +16,6 @@
 
 #define BLOCKSIZE 256
 
-#define ivpair thrust::pair<scalar_t, int>
-
-
-template<typename scalar_t>
-__forceinline__ __device__ void reduce_max_shm(ivpair* sdata, int blocksize, int tid) {
-    __syncthreads();
-    for (int s{blocksize / 2}; s > 0; s >>= 1) {
-        if (tid < s) {
-            if (sdata[tid].first < sdata[tid + s].first) {
-                sdata[tid] = sdata[tid + s];
-            }
-        }
-        __syncthreads();
-    }
-}
 
 
 template<typename scalar_t>
@@ -45,10 +29,36 @@ void broadcast_block_x(scalar_t& val, int src_id) {
     val = shm;
 }
 
+template<typename scalar_t>
+__forceinline__ __device__
+scalar_t shfl_down_sync_func(scalar_t val, uint32_t delta) {
+    return __shfl_down_sync(0xffffffff, val, delta);
+}
+
+template<>
+__forceinline__ __device__
+int8_t shfl_down_sync_func(int8_t val, uint32_t delta) {
+    int32_t ival = static_cast<int32_t>(val);
+    ival = __shfl_down_sync(0xffffffff, ival, delta);
+    return static_cast<int8_t>(ival);
+}
 
 template<typename scalar_t>
 __forceinline__ __device__
-void reduce_max(scalar_t& val, bool broadcast) {
+scalar_t max_pair_shfl_func(scalar_t& val, int32_t& ind, const uint32_t delta) {
+    scalar_t other_v = shfl_down_sync_func(val, delta);
+    int32_t other_i = shfl_down_sync_func(ind, delta);
+
+    if (other_v > val) {
+        val = other_v;
+        ind = other_i;
+    }
+}
+
+
+template<typename scalar_t>
+__forceinline__ __device__
+void reduce_max(scalar_t& val, int32_t& ind, bool broadcast) {
     /* this requires:
      * 1. warp layout is along x axis
      * 2. blockDim.x should be divisble by 32
@@ -57,36 +67,40 @@ void reduce_max(scalar_t& val, bool broadcast) {
      * 5. only thread with threadIdx.x == 0 obtains correct answer */
 
     __syncthreads();
-    val = std::max(val, __shfl_down_sync(0xffffffff, val, 16));
-    val = std::max(val, __shfl_down_sync(0xffffffff, val, 8));
-    val = std::max(val, __shfl_down_sync(0xffffffff, val, 4));
-    val = std::max(val, __shfl_down_sync(0xffffffff, val, 2));
-    val = std::max(val, __shfl_down_sync(0xffffffff, val, 1));
+    max_pair_shfl_func(val, ind, 16);
+    max_pair_shfl_func(val, ind, 8);
+    max_pair_shfl_func(val, ind, 4);
+    max_pair_shfl_func(val, ind, 2);
+    max_pair_shfl_func(val, ind, 1);
 
-    __shared__ scalar_t shm[32];
+    __shared__ scalar_t shm_v[32];
+    __shared__ int32_t  shm_i[32];
 
     if (threadIdx.x % 32 == 0) {
-        shm[threadIdx.x >> 5] = val;
+        shm_v[threadIdx.x >> 5] = val;
+        shm_i[threadIdx.x >> 5] = ind;
     }
     __syncthreads();
 
-    val = scalar_t(0.);
-
     /* from here actually only one warp work */
-    if (threadIdx.x < (blockDim.x >> 5)) {
-        val = shm[threadIdx.x];
-    }
-
     if (threadIdx.x < 32) {
-        val = std::max(val, __shfl_down_sync(0xffffffff, val, 16));
-        val = std::max(val, __shfl_down_sync(0xffffffff, val, 8));
-        val = std::max(val, __shfl_down_sync(0xffffffff, val, 4));
-        val = std::max(val, __shfl_down_sync(0xffffffff, val, 2));
-        val = std::max(val, __shfl_down_sync(0xffffffff, val, 1));
+        val = shm_v[0];
+        ind = shm_i[0];
+        int32_t n_warps = (blockDim.x >> 5);
+        if (threadIdx.x < n_warps) {
+            val = shm_v[threadIdx.x];
+            ind = shm_i[threadIdx.x];
+        }
+        max_pair_shfl_func(val, ind, 16);
+        max_pair_shfl_func(val, ind, 8);
+        max_pair_shfl_func(val, ind, 4);
+        max_pair_shfl_func(val, ind, 2);
+        max_pair_shfl_func(val, ind, 1);
     }
 
     if (broadcast) {
         broadcast_block_x(val, 0);
+        broadcast_block_x(ind, 0);
     }
 }
 
@@ -97,9 +111,9 @@ __global__ void arg_max_depth(const int n_size,
                             const int dimsize, const int m_size,
                             const scalar_t *inten,
                             int32_t *oten) {
-    extern __shared__ __align__(sizeof(ivpair)) unsigned char sdata_raw[];
-    ivpair *sdata = reinterpret_cast<ivpair*>(sdata_raw);
-    sdata = sdata + blockDim.x * threadIdx.y;
+
+    scalar_t max_val;
+    int32_t max_ind;
 
     int sample_offset = gridDim.x * blockDim.y;
     int bid = threadIdx.y + blockIdx.x * blockDim.y;
@@ -111,21 +125,23 @@ __global__ void arg_max_depth(const int n_size,
 
         /// NOTE: This is not reliable when dimsize < blockDim.x
         int idx = n_idx * dimsize * m_size + threadIdx.x * m_size + m_idx;
-        ivpair maxp = thrust::make_pair(inten[idx], threadIdx.x);
         int j = threadIdx.x + blockDim.x;
+        max_val = inten[idx];
+        max_ind = threadIdx.x;
         for (; j < dimsize; j += blockDim.x) {
             idx += blockDim.x * m_size;
             scalar_t val = inten[idx];
-            if (val > maxp.first) {
-                maxp = thrust::make_pair(val, j);
+            if (val > max_val) {
+                max_val = val;
+                max_ind = j;
             }
         }
-        sdata[threadIdx.x] = maxp;
-        __syncthreads();
-        reduce_max_shm(sdata, blockDim.x, threadIdx.x);
+        reduce_max(max_val, max_ind, false);
 
-        idx = n_idx * m_size + m_idx;
-        oten[idx] = sdata[0].second;
+        if (threadIdx.x == 0) {
+            idx = n_idx * m_size + m_idx;
+            oten[idx] = max_ind;
+        }
     }
 }
 
@@ -190,7 +206,6 @@ void argMaxFunc(const scalar_t *inten,
 
     } else {
         int blockx, blocky, gridx;
-        int shm_size = (sizeof(scalar_t) + sizeof(int)) * BLOCKSIZE;
         int block_lmt = std::min(BLOCKSIZE, dimsize);
         blockx = 32;
         while (blockx <= block_lmt) blockx = (blockx << 1);
@@ -200,10 +215,10 @@ void argMaxFunc(const scalar_t *inten,
         block.x = blockx; block.y = blocky; grid.x = gridx;
 
         if (stream == nullptr) {
-            arg_max_depth<scalar_t><<<grid, block, shm_size>>>(
+            arg_max_depth<scalar_t><<<grid, block, 0>>>(
                     n_size, dimsize, m_size, inten, oten);
         } else {
-            arg_max_depth<scalar_t><<<grid, block, shm_size, *stream>>>(
+            arg_max_depth<scalar_t><<<grid, block, 0, *stream>>>(
                     n_size, dimsize, m_size, inten, oten);
         }
     }

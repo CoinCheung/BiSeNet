@@ -192,10 +192,10 @@ int32_t ArgMaxPlugin::enqueue(PluginTensorDesc const* inputDesc, PluginTensorDes
     }
 
     string msg("argmax only support fp32/fp16/bf16/int8 currently");
-    bool typeOk = type == nvinfer1::DataType::kHALF;
-    typeOk = typeOk || type == nvinfer1::DataType::kFLOAT;
-    typeOk = typeOk || type == nvinfer1::DataType::kINT8;
+    bool typeOk = type == nvinfer1::DataType::kFLOAT;
+    typeOk = typeOk || type == nvinfer1::DataType::kHALF;
     typeOk = typeOk || type == nvinfer1::DataType::kBF16;
+    typeOk = typeOk || type == nvinfer1::DataType::kINT8;
     CHECK (typeOk, msg);
 
     if (type == nvinfer1::DataType::kFLOAT) {
@@ -207,14 +207,15 @@ int32_t ArgMaxPlugin::enqueue(PluginTensorDesc const* inputDesc, PluginTensorDes
         const __half* ptr_inp = static_cast<const __half*>(inputs[0]);
         int32_t* ptr_out = static_cast<int32_t*>(outputs[0]);
         argMaxFunc<__half>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);
+        cout << "type is: fp16" << endl;
 
     } else if (type == nvinfer1::DataType::kBF16) {
         const __nv_bfloat16* ptr_inp = static_cast<const __nv_bfloat16*>(inputs[0]);
         int32_t* ptr_out = static_cast<int32_t*>(outputs[0]);
         argMaxFunc<__nv_bfloat16>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);
-        cout << "type is: bf16" << endl;
 
     } else if (type == nvinfer1::DataType::kINT8) {
+        cout << "type is: int8" << endl;
         const int8_t* ptr_inp = static_cast<const int8_t*>(inputs[0]);
         int32_t* ptr_out = static_cast<int32_t*>(outputs[0]);
         argMaxFunc<int8_t>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);

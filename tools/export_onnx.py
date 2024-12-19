@@ -28,13 +28,13 @@ cfg = set_cfg_from_file(args.config)
 if cfg.use_sync_bn: cfg.use_sync_bn = False
 
 net = model_factory[cfg.model_type](cfg.n_cats, aux_mode=args.aux_mode)
-#  net.load_state_dict(torch.load(args.weight_pth, map_location='cpu',
-#                                 weights_only=True), strict=False)
+net.load_state_dict(torch.load(args.weight_pth, map_location='cpu',
+                               weights_only=True), strict=False)
 net.eval()
 
 
-#  dummy_input = torch.randn(1, 3, *cfg.crop_size)
-dummy_input = torch.randn(1, 3, 1024, 2048)
+dummy_input = torch.randn(1, 3, *cfg.cropsize)
+#  dummy_input = torch.randn(1, 3, 1024, 2048)
 input_names = ['input_image']
 output_names = ['preds',]
 dynamic_axes = {'input_image': {0: 'batch'}, 'preds': {0: 'batch'}}
