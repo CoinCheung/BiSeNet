@@ -129,8 +129,12 @@ bool ArgMaxPlugin::supportsFormatCombination(
     ss << "ArgMaxPlugin accepts only two input, but here pos is " << pos;
     CHECK(pos < 2, ss.str());
 
-    // TODO: what if int8
-    bool typeOk = inOut[0].desc.type == DataType::kFLOAT || inOut[0].desc.type == DataType::kHALF;
+    bool typeOk = inOut[0].desc.type == DataType::kFLOAT;
+    typeOk = typeOk || inOut[0].desc.type == DataType::kHALF;
+    typeOk = typeOk || inOut[0].desc.type == DataType::kBF16; 
+    typeOk = typeOk || inOut[0].desc.type == DataType::kINT8; 
+    // here support int8, and enqueue() will recieve int8 input
+    // or it will drop back to float/half to call enqueue()
 
     bool formatOK = inOut[0].desc.format == PluginFormat::kLINEAR;
 
@@ -140,7 +144,7 @@ bool ArgMaxPlugin::supportsFormatCombination(
 int32_t ArgMaxPlugin::getOutputDataTypes(
     DataType* outputTypes, int32_t nbOutputs, DataType const* inputTypes, int32_t nbInputs) const noexcept
 {
-    outputTypes[0] = DataType::kINT64;
+    outputTypes[0] = DataType::kINT32;
     return 0;
 }
 
@@ -187,20 +191,36 @@ int32_t ArgMaxPlugin::enqueue(PluginTensorDesc const* inputDesc, PluginTensorDes
         }
     }
 
-    string msg("argmax only support fp32 and fp16 currently");
-    CHECK ((type == nvinfer1::DataType::kHALF || type == nvinfer1::DataType::kFLOAT), msg);
+    string msg("argmax only support fp32/fp16/bf16/int8 currently");
+    bool typeOk = type == nvinfer1::DataType::kHALF;
+    typeOk = typeOk || type == nvinfer1::DataType::kFLOAT;
+    typeOk = typeOk || type == nvinfer1::DataType::kINT8;
+    typeOk = typeOk || type == nvinfer1::DataType::kBF16;
+    CHECK (typeOk, msg);
 
     if (type == nvinfer1::DataType::kFLOAT) {
         const float* ptr_inp = static_cast<const float*>(inputs[0]);
-        int64_t* ptr_out = static_cast<int64_t*>(outputs[0]);
+        int32_t* ptr_out = static_cast<int32_t*>(outputs[0]);
         argMaxFunc<float>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);
 
     } else if (type == nvinfer1::DataType::kHALF) {
-        // const __half* ptr_inp = static_cast<const __half*>(inputs[0]);
-        // __half* ptr_out = static_cast<__half*>(outputs[0]);
-        // argMaxFunc<__half>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);
+        const __half* ptr_inp = static_cast<const __half*>(inputs[0]);
+        int32_t* ptr_out = static_cast<int32_t*>(outputs[0]);
+        argMaxFunc<__half>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);
+
+    } else if (type == nvinfer1::DataType::kBF16) {
+        const __nv_bfloat16* ptr_inp = static_cast<const __nv_bfloat16*>(inputs[0]);
+        int32_t* ptr_out = static_cast<int32_t*>(outputs[0]);
+        argMaxFunc<__nv_bfloat16>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);
+        cout << "type is: bf16" << endl;
+
+    } else if (type == nvinfer1::DataType::kINT8) {
+        const int8_t* ptr_inp = static_cast<const int8_t*>(inputs[0]);
+        int32_t* ptr_out = static_cast<int32_t*>(outputs[0]);
+        argMaxFunc<int8_t>(ptr_inp, ptr_out, n_size, dimsize, m_size, &stream);
 
     } else {
+        cout << "type is: other" << endl;
     }
     return 0;
 }

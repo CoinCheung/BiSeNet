@@ -266,7 +266,7 @@ class CustomArgMax(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, feat_out, dim):
-        return feat_out.argmax(dim=dim)
+        return feat_out.argmax(dim=dim).int()
 
     @staticmethod
     def symbolic(g, feat_out, dim: int):

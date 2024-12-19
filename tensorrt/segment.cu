@@ -131,7 +131,7 @@ void run_with_trt(vector<string> args) {
     read_data(args[2], &data[0], iH, iW, orgH, orgW);
 
     // call engine
-    vector<int64_t> res = ss_trt.inference(data);
+    vector<int32_t> res = ss_trt.inference(data);
 
     // generate colored out
     vector<vector<uint8_t>> color_map = get_color_map();

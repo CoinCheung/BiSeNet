@@ -4,10 +4,12 @@ PROJECT(segment LANGUAGES CUDA CXX)
 
 # set(CMAKE_CXX_FLAGS "-std=c++17 -O2")
 
+message (${CMAKE_CUDA_ARCHITECTURES})
+
 set (CMAKE_BUILD_TYPE Release)
 set (CMAKE_CUDA_FLAGS_RELEASE "-O2 -DNDEBUG")
 if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    set (CMAKE_CUDA_ARCHITECTURES 90)
+    set (CMAKE_CUDA_ARCHITECTURES 80)
 endif ()
 
 # link_directories(${PROJECT_SOURCE_DIR}/build ${PROJECT_SOURCE_DIR}/build/plugins)
@@ -31,18 +33,4 @@ target_include_directories(segment PUBLIC ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(segment ${OpenCV_LIBRARIES}
     nvinfer nvinfer_plugin nvonnxparser custom_plugin
 )
-
-
-
-## deprecated
-# link_directories(/usr/local/cuda/lib64)
-# find_package(CUDA REQUIRED)
-# cuda_add_library(kernels STATIC kernels.cu)
-# target_include_directories(
-#     segment PUBLIC ${CUDA_INCLUDE_DIRS} ${CUDNN_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
-# target_link_libraries(
-#     segment -lnvinfer -lnvinfer_plugin -lnvonnxparser
-#     ${CUDA_LIBRARIES} ${CUDART_LIB} ${NVINFER_LIB}
-#     ${OpenCV_LIBRARIES})
-
 

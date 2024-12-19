@@ -9,6 +9,7 @@
 #include <thrust/pair.h>
 #include <cuda.h>
 #include <cuda_fp16.h>
+#include <cuda_bf16.h>
 #include <cuda_runtime.h>
 #include "NvInfer.h"
 
@@ -18,28 +19,9 @@
 
 #define ivpair thrust::pair<scalar_t, int>
 
-// __device__ __forceinline__
-// bool operator<(const __half a, const __half b) {
-//     return __hlt(a, b);
-// }
-//
-// __device__ __forceinline__
-// bool operator<=(const __half a, const __half b) {
-//     return __hle(a, b);
-// }
-//
-// __device__ __forceinline__
-// bool operator>(const __half a, const __half b) {
-//     return __hgt(a, b);
-// }
-//
-// __device__ __forceinline__
-// bool operator>=(const __half a, const __half b) {
-//     return __hge(a, b);
-// }
 
 template<typename scalar_t>
-__forceinline__ __device__ void reduce_max(ivpair* sdata, int blocksize, int tid) {
+__forceinline__ __device__ void reduce_max_shm(ivpair* sdata, int blocksize, int tid) {
     __syncthreads();
     for (int s{blocksize / 2}; s > 0; s >>= 1) {
         if (tid < s) {
@@ -53,10 +35,68 @@ __forceinline__ __device__ void reduce_max(ivpair* sdata, int blocksize, int tid
 
 
 template<typename scalar_t>
+__forceinline__ __device__
+void broadcast_block_x(scalar_t& val, int src_id) {
+    __shared__ scalar_t shm; 
+    if (threadIdx.x == src_id) {
+        shm = val;
+    }
+    __syncthreads();
+    val = shm;
+}
+
+
+template<typename scalar_t>
+__forceinline__ __device__
+void reduce_max(scalar_t& val, bool broadcast) {
+    /* this requires:
+     * 1. warp layout is along x axis
+     * 2. blockDim.x should be divisble by 32
+     * 3. blockDim.x should be less or equal to 1024
+     * 4. warpSize should be 32
+     * 5. only thread with threadIdx.x == 0 obtains correct answer */
+
+    __syncthreads();
+    val = std::max(val, __shfl_down_sync(0xffffffff, val, 16));
+    val = std::max(val, __shfl_down_sync(0xffffffff, val, 8));
+    val = std::max(val, __shfl_down_sync(0xffffffff, val, 4));
+    val = std::max(val, __shfl_down_sync(0xffffffff, val, 2));
+    val = std::max(val, __shfl_down_sync(0xffffffff, val, 1));
+
+    __shared__ scalar_t shm[32];
+
+    if (threadIdx.x % 32 == 0) {
+        shm[threadIdx.x >> 5] = val;
+    }
+    __syncthreads();
+
+    val = scalar_t(0.);
+
+    /* from here actually only one warp work */
+    if (threadIdx.x < (blockDim.x >> 5)) {
+        val = shm[threadIdx.x];
+    }
+
+    if (threadIdx.x < 32) {
+        val = std::max(val, __shfl_down_sync(0xffffffff, val, 16));
+        val = std::max(val, __shfl_down_sync(0xffffffff, val, 8));
+        val = std::max(val, __shfl_down_sync(0xffffffff, val, 4));
+        val = std::max(val, __shfl_down_sync(0xffffffff, val, 2));
+        val = std::max(val, __shfl_down_sync(0xffffffff, val, 1));
+    }
+
+    if (broadcast) {
+        broadcast_block_x(val, 0);
+    }
+}
+
+
+
+template<typename scalar_t>
 __global__ void arg_max_depth(const int n_size,
                             const int dimsize, const int m_size,
                             const scalar_t *inten,
-                            int64_t *oten) {
+                            int32_t *oten) {
     extern __shared__ __align__(sizeof(ivpair)) unsigned char sdata_raw[];
     ivpair *sdata = reinterpret_cast<ivpair*>(sdata_raw);
     sdata = sdata + blockDim.x * threadIdx.y;
@@ -69,7 +109,7 @@ __global__ void arg_max_depth(const int n_size,
         int n_idx = i / m_size;
         int m_idx = i % m_size;
 
-        /// NOTE: This is not memory-safe when dimsize < blockDim.x
+        /// NOTE: This is not reliable when dimsize < blockDim.x
         int idx = n_idx * dimsize * m_size + threadIdx.x * m_size + m_idx;
         ivpair maxp = thrust::make_pair(inten[idx], threadIdx.x);
         int j = threadIdx.x + blockDim.x;
@@ -82,7 +122,7 @@ __global__ void arg_max_depth(const int n_size,
         }
         sdata[threadIdx.x] = maxp;
         __syncthreads();
-        reduce_max(sdata, blockDim.x, threadIdx.x);
+        reduce_max_shm(sdata, blockDim.x, threadIdx.x);
 
         idx = n_idx * m_size + m_idx;
         oten[idx] = sdata[0].second;
@@ -94,7 +134,7 @@ template<typename scalar_t>
 __global__ void arg_max_spatial(const int n_size,
                             const int dimsize, const int m_size,
                             const scalar_t *inten,
-                            int64_t *oten) {
+                            int32_t *oten) {
 
     int sample_offset = gridDim.x * blockDim.x;
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -124,7 +164,7 @@ __global__ void arg_max_spatial(const int n_size,
 
 template<typename scalar_t>
 void argMaxFunc(const scalar_t *inten,
-                int64_t *oten, const int n_size,
+                int32_t *oten, const int n_size,
                 const int dimsize, const int m_size,
                 cudaStream_t* stream) {
 
@@ -133,7 +173,7 @@ void argMaxFunc(const scalar_t *inten,
     int samplesize = n_size * m_size;
     dim3 grid, block;
 
-    if (dimsize <= 256) {
+    if (dimsize <= 128) {
         int blockx, gridx;
         cudaOccupancyMaxPotentialBlockSize(&gridx, &blockx,
                 arg_max_spatial<scalar_t>, 0, samplesize);

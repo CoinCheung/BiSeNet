@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "argmax_plugin.h"
 
 
 using std::string;
@@ -62,6 +63,7 @@ public:
     TrtSharedEnginePtr engine;
     CudaStreamUnqPtr stream;
     TrtUnqPtr<IRuntime> runtime;
+    std::unique_ptr<ArgMaxPluginCreator> plugin_creator;
 
     string input_name;
     string output_name;
@@ -73,6 +75,8 @@ public:
         stream.reset(new cudaStream_t);
         auto fail = cudaStreamCreate(stream.get());
         CHECK(!fail, "create stream failed");
+        
+        register_plugins();
     }
 
     ~SemanticSegmentTrt() {
@@ -80,6 +84,8 @@ public:
         runtime.reset();
         stream.reset();
     }
+
+    void register_plugins();
 
     void set_opt_batch_size(int bs);
 
@@ -90,7 +96,7 @@ public:
     void parse_to_engine(string onnx_path, string quant, 
         string data_root, string data_file);
 
-    vector<int64_t> inference(vector<float>& data);
+    vector<int32_t> inference(vector<float>& data);
 
     void test_speed_fps();
 

@@ -51,14 +51,16 @@ void CHECK(bool condition, string msg) {
 }
 
 
-
-void SemanticSegmentTrt::parse_to_engine(string onnx_pth, 
-        string quant, string data_root, string data_file) {
-
-    std::unique_ptr<ArgMaxPluginCreator> plugin_creator{new ArgMaxPluginCreator{}};
+void SemanticSegmentTrt::register_plugins() {
+    // this should be before onnx parser
+    plugin_creator.reset(new ArgMaxPluginCreator{});
     plugin_creator->setPluginNamespace("");
     bool status = getPluginRegistry()->registerCreator(*plugin_creator.get(), "");
     CHECK(status, "failed to register plugin");
+}
+
+void SemanticSegmentTrt::parse_to_engine(string onnx_pth, 
+        string quant, string data_root, string data_file) {
 
     auto builder = TrtUnqPtr<IBuilder>(nvinfer1::createInferBuilder(gLogger));
     CHECK(static_cast<bool>(builder), "create builder failed");
@@ -187,11 +189,6 @@ void SemanticSegmentTrt::deserialize(string serpth) {
     ifile.close();
     cout << "model size: " << mdsize << endl;
 
-    std::unique_ptr<ArgMaxPluginCreator> plugin_creator{new ArgMaxPluginCreator{}};
-    plugin_creator->setPluginNamespace("");
-    bool status = getPluginRegistry()->registerCreator(*plugin_creator.get(), "");
-    CHECK(status, "failed to register plugin");
-
     runtime.reset(nvinfer1::createInferRuntime(gLogger));
     engine.reset(runtime->deserializeCudaEngine((void*)&buf[0], mdsize));
 
@@ -200,7 +197,7 @@ void SemanticSegmentTrt::deserialize(string serpth) {
 }
 
 
-vector<int64_t> SemanticSegmentTrt::inference(vector<float>& data) {
+vector<int32_t> SemanticSegmentTrt::inference(vector<float>& data) {
     Dims in_dims = engine->getTensorShape(input_name.c_str());
     Dims out_dims = engine->getTensorShape(output_name.c_str());
 
@@ -211,12 +208,12 @@ vector<int64_t> SemanticSegmentTrt::inference(vector<float>& data) {
     Dims4 in_shape(batchsize, in_dims.d[1], in_dims.d[2], in_dims.d[3]);
 
     vector<void*> buffs(2, nullptr);
-    vector<int64_t> res(out_size);
+    vector<int32_t> res(out_size);
 
     cudaError_t state;
     state = cudaMalloc(&buffs[0], in_size * sizeof(float));
     CHECK(state == cudaSuccess, "allocate memory failed");
-    state = cudaMalloc(&buffs[1], out_size * sizeof(int64_t));
+    state = cudaMalloc(&buffs[1], out_size * sizeof(int32_t));
     CHECK(state == cudaSuccess, "allocate memory failed");
 
     state = cudaMemcpyAsync(
@@ -235,7 +232,7 @@ vector<int64_t> SemanticSegmentTrt::inference(vector<float>& data) {
     context->enqueueV3(*stream);
 
     state = cudaMemcpyAsync(
-            &res[0], buffs[1], out_size * sizeof(int64_t),
+            &res[0], buffs[1], out_size * sizeof(int32_t),
             cudaMemcpyDeviceToHost, *stream);
     CHECK(state == cudaSuccess, "transmit back to host failed");
 
@@ -265,7 +262,7 @@ void SemanticSegmentTrt::test_speed_fps() {
     cudaError_t state;
     state = cudaMalloc(&buffs[0], in_size * sizeof(float));
     CHECK(state == cudaSuccess, "allocate memory failed");
-    state = cudaMalloc(&buffs[1], out_size * sizeof(int64_t));
+    state = cudaMalloc(&buffs[1], out_size * sizeof(int32_t));
     CHECK(state == cudaSuccess, "allocate memory failed");
 
     auto context = TrtUnqPtr<IExecutionContext>(engine->createExecutionContext());
