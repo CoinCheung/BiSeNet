@@ -115,11 +115,9 @@ __global__ void arg_max_depth(const int n_size,
     scalar_t max_val;
     int32_t max_ind;
 
-    int sample_offset = gridDim.x * blockDim.y;
-    int bid = threadIdx.y + blockIdx.x * blockDim.y;
     int samplesize = n_size * m_size;
 
-    for (int i{bid}; i < samplesize; i += sample_offset) {
+    for (int i=blockIdx.x; i < samplesize; i += gridDim.x) {
         int n_idx = i / m_size;
         int m_idx = i % m_size;
 
@@ -205,14 +203,13 @@ void argMaxFunc(const scalar_t *inten,
         }
 
     } else {
-        int blockx, blocky, gridx;
+        int blockx, gridx;
         int block_lmt = std::min(BLOCKSIZE, dimsize);
         blockx = 32;
         while (blockx <= block_lmt) blockx = (blockx << 1);
         blockx = (blockx >> 1); // must make sure dimsize > blockx
-        blocky = BLOCKSIZE / blockx;
-        gridx = std::min(4096, samplesize / blocky);
-        block.x = blockx; block.y = blocky; grid.x = gridx;
+        gridx = std::min(16384, samplesize);
+        block.x = blockx; grid.x = gridx;
 
         if (stream == nullptr) {
             arg_max_depth<scalar_t><<<grid, block, 0>>>(
