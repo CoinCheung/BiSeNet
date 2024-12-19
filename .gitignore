@@ -119,7 +119,9 @@ openvino/build/*
 openvino/output*
 ncnn/models/*
 *.onnx
+*.pth
 tis/cpp_client/build/*
 log*txt
+000000320425.jpg
 
 tvm/

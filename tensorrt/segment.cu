@@ -1,12 +1,12 @@
-#include "NvInfer.h"
-#include "NvOnnxParser.h"
-#include "NvInferPlugin.h"
-#include <cuda_runtime_api.h>
-#include "NvInferRuntimeCommon.h"
+// #include "NvInfer.h"
+// #include "NvOnnxParser.h"
+// #include "NvInferPlugin.h"
+// #include "NvInferRuntimeCommon.h"
 
 #include <opencv2/opencv.hpp>
 
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <fstream>
 #include <vector>
@@ -19,17 +19,17 @@
 #include "read_img.hpp"
 
 
-using nvinfer1::IHostMemory;
-using nvinfer1::IBuilder;
-using nvinfer1::INetworkDefinition;
-using nvinfer1::ICudaEngine;
-using nvinfer1::IInt8Calibrator;
-using nvinfer1::IBuilderConfig;
-using nvinfer1::IRuntime;
-using nvinfer1::IExecutionContext;
-using nvinfer1::ILogger;
-using nvinfer1::Dims;
-using Severity = nvinfer1::ILogger::Severity;
+// using nvinfer1::IHostMemory;
+// using nvinfer1::IBuilder;
+// using nvinfer1::INetworkDefinition;
+// using nvinfer1::ICudaEngine;
+// using nvinfer1::IInt8Calibrator;
+// using nvinfer1::IBuilderConfig;
+// using nvinfer1::IRuntime;
+// using nvinfer1::IExecutionContext;
+// using nvinfer1::ILogger;
+// using nvinfer1::Dims;
+// using Severity = nvinfer1::ILogger::Severity;
 
 using std::string;
 using std::ios;
@@ -123,7 +123,7 @@ void run_with_trt(vector<string> args) {
     vector<int> o_dims = ss_trt.get_output_shape();
 
     const int iH{i_dims[2]}, iW{i_dims[3]};
-    const int oH{o_dims[2]}, oW{o_dims[3]};
+    const int oH{o_dims[1]}, oW{o_dims[2]};
 
     // prepare image and resize
     vector<float> data; data.resize(iH * iW * 3);
@@ -131,15 +131,17 @@ void run_with_trt(vector<string> args) {
     read_data(args[2], &data[0], iH, iW, orgH, orgW);
 
     // call engine
-    vector<int> res = ss_trt.inference(data);
+    vector<int32_t> res = ss_trt.inference(data);
 
     // generate colored out
     vector<vector<uint8_t>> color_map = get_color_map();
     Mat pred(cv::Size(oW, oH), CV_8UC3);
+
     int idx{0};
     for (int i{0}; i < oH; ++i) {
         uint8_t *ptr = pred.ptr<uint8_t>(i);
         for (int j{0}; j < oW; ++j) {
+
             ptr[0] = color_map[res[idx]][0];
             ptr[1] = color_map[res[idx]][1];
             ptr[2] = color_map[res[idx]][2];
