@@ -115,7 +115,7 @@ Download `ADEChallengeData2016.zip` from this [website](http://sceneparsing.csai
 $ unzip ADEChallengeData2016.zip
 $ mv ADEChallengeData2016/images /path/to/BiSeNet/datasets/ade20k/
 $ mv ADEChallengeData2016/annotations /path/to/BiSeNet/datasets/ade20k/
-$ python tools/gen_dataset_annos.py --ade20k
+$ python tools/gen_dataset_annos.py --dataset ade20k
 ```
 
 
