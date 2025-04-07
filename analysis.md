@@ -124,3 +124,5 @@ Conclusion: May be useful for reference.
 
 - train_amp.py\
 
+This script is used to train a semantic segmentation model using mixed precision training (AMP). Mixed precision training allows for faster training and reduced memory usage by using both 16-bit and 32-bit floating point numbers.
+Conclusion: Extremely useful for reference. I should use this script as a base for my own implementation.
