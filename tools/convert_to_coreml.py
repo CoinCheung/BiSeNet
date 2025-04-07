@@ -35,11 +35,15 @@ cfg = set_cfg_from_file(args.config)
 
 # prepare data
 to_tensor = T.ToTensor(
-    mean=(0.3257, 0.3690, 0.3223), # city, rgb
-    std=(0.2112, 0.2148, 0.2115),
+    # mean=(0.3257, 0.3690, 0.3223), # city, rgb
+    # std=(0.2112, 0.2148, 0.2115),
+    mean=(0.0, 0.0, 0.0), # placeholder
+    std=(1.0, 1.0, 1.0),
 )
+scale = 1/(0.2125*255.0)
+bias = [- 0.3257/(0.2112) , - 0.3690/(0.2148), - 0.3223/(0.2115)]
 print('Loading image:', args.img_path)
-im = cv2.imread(args.img_path)[:, :, ::-1]
+im = cv2.imread(args.img_path)#[:, :, ::-1]
 # Resize
 im = cv2.resize(im, (512, 256))
 im = to_tensor(dict(im=im, lb=None))['im'].unsqueeze(0)#.cuda()
@@ -54,8 +58,8 @@ class WrappedBiSeNetv2(nn.Module):
 
     def forward(self, x):
         res = self.model(x)[0]
-        out = torch.argmax(res, dim=1, keepdim=True)
-        out = out.float() / 255
+        out = torch.argmax(res, dim=1, keepdim=True).float()
+        # out = out.float() / 255
         return out
 
 torch_model = WrappedBiSeNetv2(cfg).eval()
@@ -63,7 +67,7 @@ traced_model = torch.jit.trace(torch_model, im)
 
 mlmodel_from_trace = ct.convert(
     traced_model,
-    inputs=[ct.ImageType(name="input", shape=im.shape)],
+    inputs=[ct.ImageType(name="input", shape=im.shape, scale=scale, bias=bias)],
     outputs=[ct.ImageType(name="output", color_layout=ct.colorlayout.GRAYSCALE)],
     # compute_precision=ct.precision.FLOAT16
     # minimum_deployment_target=ct.target.iOS13,
@@ -84,3 +88,4 @@ print(f"Saved the model to {args.out_pth}")
 # model7: model with image input and image output, image size (1024 x 512), cpu and gpu
 # model8: model with image input and image output, image size (1024 x 512), with fp16 (which happens to be default anyway)
 # model9: model with image input and image output, image size (512 x 256)
+# model10: model with image input and image output, image size (512 x 256), with normalization done within the coreml model. 
