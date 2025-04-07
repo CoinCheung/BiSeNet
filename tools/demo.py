@@ -19,7 +19,7 @@ from configs import set_cfg_from_file
 #  torch.set_num_threads(4)
 
 torch.set_grad_enabled(False)
-np.random.seed(123)
+np.random.seed(255)
 
 
 # args
@@ -44,6 +44,7 @@ to_tensor = T.ToTensor(
     mean=(0.3257, 0.3690, 0.3223), # city, rgb
     std=(0.2112, 0.2148, 0.2115),
 )
+print('Loading image:', args.img_path)
 im = cv2.imread(args.img_path)[:, :, ::-1]
 im = to_tensor(dict(im=im, lb=None))['im'].unsqueeze(0).cuda()
 
@@ -59,5 +60,6 @@ out = out.argmax(dim=1)
 
 # visualize
 out = out.squeeze().detach().cpu().numpy()
+print(np.unique(out))
 pred = palette[out]
 cv2.imwrite('./res.jpg', pred)

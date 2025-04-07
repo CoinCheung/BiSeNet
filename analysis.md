@@ -126,3 +126,6 @@ Conclusion: May be useful for reference.
 
 This script is used to train a semantic segmentation model using mixed precision training (AMP). Mixed precision training allows for faster training and reduced memory usage by using both 16-bit and 32-bit floating point numbers.
 Conclusion: Extremely useful for reference. I should use this script as a base for my own implementation.
+
+Note on mixed precision training:\
+The model trained with mixed precision and distributed training can be converted to CoreML. Mixed precision does not affect the final model weights, and any issues with distributed training can be resolved by cleaning the state dictionary. Afterward, you can export the model to ONNX and convert it to CoreML using the appropriate tools.
