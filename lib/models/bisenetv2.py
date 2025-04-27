@@ -353,7 +353,7 @@ class BiSeNetV2(nn.Module):
             logits_aux5_4 = self.aux5_4(feat5_4)
             return logits, logits_aux2, logits_aux3, logits_aux4, logits_aux5_4
         elif self.aux_mode == 'eval':
-            return logits,
+            return logits
         elif self.aux_mode == 'pred':
             #  pred = logits.argmax(dim=1)
             pred = CustomArgMax.apply(logits, 1)

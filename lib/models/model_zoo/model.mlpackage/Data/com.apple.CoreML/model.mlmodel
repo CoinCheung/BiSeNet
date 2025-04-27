@@ -1,22 +1,21 @@
-÷
+⁄
 
 input
-"ÄÄR
-output
-"ÄÄ
-¢ß¢9
+"ÄÄR
+var_886*
+ÄÄ†Ä¢ß¢9
 #com.github.apple.coremltools.sourcetorch==2.6.0+cu118¢:
 +com.github.apple.coremltools.source_dialectTorchScript¢+
-$com.github.apple.coremltools.version8.2≤ü¢´†
-main°†
+$com.github.apple.coremltools.version8.2≤Ÿ•Â£
+main€£
 )
 input 
 
 
 
 Ä
-ÄCoreML5Èü
-CoreML5‹üoutputj
+ÄCoreML5££
+CoreML5ñ£var_886j
 const
 input__scaled___y_0
 *)
@@ -230,7 +229,7 @@ $com.github.apple.coremltools.version8.2≤ü¢´†
 
 
 "
-cast_2‡
+cast_1‡
 conv
 bias
 
@@ -9251,140 +9250,187 @@ $model_head_conv_out_1_weight_to_fp16
 name
 
 "
-input_cast_fp16v
-const!
-res_scale_factor_height_0
-*/
-name'
-
-"
-res_scale_factor_height_0*
+input_cast_fp16}
+const%
+var_883_scale_factor_height_0
+*2
+name*
+"
+ "
+op_883_scale_factor_height_0*
 val
 
 
 
 
-   At
-const 
-res_scale_factor_width_0
-*.
-name&
-
-"
-res_scale_factor_width_0*
+   A{
+const$
+var_883_scale_factor_width_0
+*1
+name)
+!
+"
+op_883_scale_factor_width_0*
 val
 
 
 
 
-   Ag
-const
-res_align_corners_0
-*)
-name!
-
-"
-res_align_corners_0*
+   An
+const
+var_883_align_corners_0
+*,
+name$
+
+"
+op_883_align_corners_0*
 val
 
 
- ô
-upsample_bilinear(
-align_corners
-
-res_align_corners_0
+ ¨
+upsample_bilinear,
+align_corners
+
+var_883_align_corners_0
 x
 
-input_cast_fp162
-scale_factor_width
-
-res_scale_factor_width_04
-scale_factor_height
-
-res_scale_factor_height_01
-res_cast_fp16 
+input_cast_fp166
+scale_factor_width 
+
+var_883_scale_factor_width_08
+scale_factor_height!
+
+var_883_scale_factor_height_05
+var_883_cast_fp16 
 
 
 
 
 Ä
-Ä*#
-name
-
-"
-res_cast_fp16\
-const
-var_886_axis_0
-*#
-name
-
-"
-op_886_axis_0*
-val
-
-
-f
-const
-var_886_keep_dims_0
-*(
-name 
-
-"
-op_886_keep_dims_0*
-val
-
-
-»
-reduce_argmax$
-	keep_dims
-
-var_886_keep_dims_0
-x
+Ä*&
+name
+
+"
+op_883_cast_fp16q
+const
+var_886_begin_0
+
+
+*$
+name
+
+"
+op_886_begin_0*!
+val
+
+
+
+
+
+    o
+const
+var_886_end_0
+
+
+*"
+name
+
+"
+op_886_end_0*#
+val
+
+
+
+
+
+ÄÄw
+const"
+var_886_end_mask_0
+
+
+*'
+name
+
+"
+op_886_end_mask_0*!
+val
+
+
+
+
+
+ 
+const&
+var_886_squeeze_mask_0
+
+
+*+
+name#
+
+"
+op_886_squeeze_mask_0*!
+val
+
+
+
+
+
+   ç
+slice_by_index"
+end_mask
+
+var_886_end_mask_0*
+squeeze_mask
+
+var_886_squeeze_mask_0
+x
+
+var_883_cast_fp16
+end
 
-res_cast_fp16
-axis
-
-var_886_axis_05
-var_886_cast_fp16 
-
-
-
+var_886_end_0
+begin
+
+var_886_begin_0/
+var_886_cast_fp16
+
+
+
 Ä
 Ä*&
 name
 
 "
-op_886_cast_fp16`
-const
-cast_0_dtype_0
-*$
-name
-
-"
-cast_0_dtype_0*
+op_886_cast_fp16Ö
+const)
+!var_886_cast_fp16_to_fp32_dtype_0
+*6
+name.
+&
+$""
+ op_886_cast_fp16_to_fp32_dtype_0*
 val
 
 
 "
-fp32â
+fp32ó
 cast
 x
 
-var_886_cast_fp16
-dtype
-
-cast_0_dtype_0*
-output 
-
-
-
+var_886_cast_fp16.
+dtype%
+#
+!var_886_cast_fp16_to_fp32_dtype_0%
+var_886
+
+
 Ä
 Ä*
 name
 
 
 "
-cast_1"Î
+cast_0"Î
 	buildInfo›"
 
 

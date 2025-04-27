@@ -58,9 +58,10 @@ class WrappedBiSeNetv2(nn.Module):
 
     def forward(self, x):
         res = self.model(x)[0]
-        out = torch.argmax(res, dim=1, keepdim=True).float()
-        # out = out.float() / 255
-        return out
+        # print("res.shape:", res.shape)
+        # out = torch.argmax(res, dim=1, keepdim=True).float()
+        # out = out.float() / 255.0
+        return res
 
 torch_model = WrappedBiSeNetv2(cfg).eval()
 traced_model = torch.jit.trace(torch_model, im)
@@ -68,7 +69,8 @@ traced_model = torch.jit.trace(torch_model, im)
 mlmodel_from_trace = ct.convert(
     traced_model,
     inputs=[ct.ImageType(name="input", shape=im.shape, scale=scale, bias=bias)],
-    outputs=[ct.ImageType(name="output", color_layout=ct.colorlayout.GRAYSCALE)],
+    # outputs=[ct.TensorType(name="output")],
+    # outputs=[ct.ImageType(name="output", color_layout=ct.colorlayout.GRAYSCALE)],
     # compute_precision=ct.precision.FLOAT16
     # minimum_deployment_target=ct.target.iOS13,
     # compute_units=ct.ComputeUnit.CPU_AND_GPU
@@ -89,3 +91,5 @@ print(f"Saved the model to {args.out_pth}")
 # model8: model with image input and image output, image size (1024 x 512), with fp16 (which happens to be default anyway)
 # model9: model with image input and image output, image size (512 x 256)
 # model10: model with image input and image output, image size (512 x 256), with normalization done within the coreml model. 
+# model11: model with image input and image output, image size (512 x 256), with normalization done within the coreml model, with float output (/255)
+# model12: model with image input and image output, image size (512 x 256), with normalization done within the coreml model, with non argmax output
