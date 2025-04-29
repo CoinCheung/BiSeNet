@@ -154,13 +154,13 @@ class MscEvalV0(object):
             for scale in self.scales:
                 sH, sW = int(scale * H), int(scale * W)
                 sH, sW = get_round_size((sH, sW))
-                print('imgs shape:', imgs.shape, sH, sW)
+                # print('imgs shape:', imgs.shape, sH, sW)
                 im_sc = F.interpolate(imgs, size=(sH, sW),
                         mode='bilinear', align_corners=True)
 
                 im_sc = im_sc.cuda()
                 logits = net(im_sc)[0]
-                print('logits shape:', logits.shape, size)
+                # print('logits shape:', logits.shape, size)
                 logits = F.interpolate(logits, size=size,
                         mode='bilinear', align_corners=True)
                 probs += torch.softmax(logits, dim=1)

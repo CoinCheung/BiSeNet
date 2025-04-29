@@ -114,6 +114,7 @@ datasets/coco/train.txt
 datasets/coco/val.txt
 datasets/ade20k/train.txt
 datasets/ade20k/val.txt
+datasets/cityscapes_backup
 pretrained/*
 run.sh
 openvino/build/*
