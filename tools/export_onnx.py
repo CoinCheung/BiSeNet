@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, '.')
 
 import torch
-from torch.onnx import OperatorExportTypes
+from torch.export import Dim
 
 from lib.models import model_factory
 from configs import set_cfg_from_file
@@ -37,11 +37,13 @@ dummy_input = torch.randn(1, 3, *cfg.cropsize)
 #  dummy_input = torch.randn(1, 3, 1024, 2048)
 input_names = ['input_image']
 output_names = ['preds',]
-dynamic_axes = {'input_image': {0: 'batch'}, 'preds': {0: 'batch'}}
+batch_size = Dim('batch', min=1, max=128)
+dynamic_shapes = ({0: batch_size},)
 
 torch.onnx.export(net, dummy_input, args.out_pth,
     input_names=input_names, output_names=output_names,
+    do_constant_folding=True,
     verbose=False, opset_version=18,
-    operator_export_type=OperatorExportTypes.ONNX_FALLTHROUGH,
-    dynamic_axes=dynamic_axes)
+    external_data=False,
+    dynamic_shapes=dynamic_shapes)
 
