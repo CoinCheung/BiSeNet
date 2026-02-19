@@ -102,42 +102,33 @@ void SemanticSegmentTrt::parse_to_engine(string onnx_pth,
     config->addOptimizationProfile(profile);
 
     config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 1UL << 32);
+    config->setBuilderOptimizationLevel(5);
 
-    if (quant == "fp16" or quant == "int8") { // fp16
-        if (builder->platformHasFastFp16() == false) {
-            cout << "fp16 is set, but platform does not support, so we ignore this\n";
-        } else {
-            config->setFlag(nvinfer1::BuilderFlag::kFP16); 
-        }
-    }
-    if (quant == "bf16") { // bf16
+    if (quant == "fp16") { // fp16
+        config->setFlag(nvinfer1::BuilderFlag::kFP16); 
+    } else if (quant == "int8") { // int8
+        config->setFlag(nvinfer1::BuilderFlag::kFP16); 
+        config->setFlag(nvinfer1::BuilderFlag::kINT8); 
+    } else if (quant == "bf16") { // bf16
         config->setFlag(nvinfer1::BuilderFlag::kBF16); 
-    }
-    if (quant == "fp8") { // fp8
+    } else if (quant == "fp8") { // fp8
         config->setFlag(nvinfer1::BuilderFlag::kFP8); 
     }
 
     std::unique_ptr<IInt8Calibrator> calibrator;
     if (quant == "int8") { // int8
-        if (builder->platformHasFastInt8() == false) {
-            cout << "int8 is set, but platform does not support, so we ignore this\n";
-        } else {
+        int batchsize = 32;
+        int n_cal_batches = -1;
+        string cal_table_name = "calibrate_int8";
 
-            int batchsize = 32;
-            int n_cal_batches = -1;
-            string cal_table_name = "calibrate_int8";
+        Dims indim = network->getInput(0)->getDimensions();
+        BatchStream calibrationStream(
+                batchsize, n_cal_batches, indim,
+                data_root, data_file);
 
-            Dims indim = network->getInput(0)->getDimensions();
-            BatchStream calibrationStream(
-                    batchsize, n_cal_batches, indim,
-                    data_root, data_file);
-
-            config->setFlag(nvinfer1::BuilderFlag::kINT8); 
-
-            calibrator.reset(new Int8EntropyCalibrator2<BatchStream>(
-                calibrationStream, 0, cal_table_name.c_str(), input_name.c_str(), false));
-            config->setInt8Calibrator(calibrator.get());
-        }
+        calibrator.reset(new Int8EntropyCalibrator2<BatchStream>(
+            calibrationStream, 0, cal_table_name.c_str(), input_name.c_str(), false));
+        config->setInt8Calibrator(calibrator.get());
     }
 
     // output->setType(nvinfer1::DataType::kINT32);

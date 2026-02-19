@@ -45,7 +45,7 @@ int8_t shfl_down_sync_func(int8_t val, uint32_t delta) {
 
 template<typename scalar_t>
 __forceinline__ __device__
-scalar_t max_pair_shfl_func(scalar_t& val, int32_t& ind, const uint32_t delta) {
+void max_pair_shfl_func(scalar_t& val, int32_t& ind, const uint32_t delta) {
     scalar_t other_v = shfl_down_sync_func(val, delta);
     int32_t other_i = shfl_down_sync_func(ind, delta);
 

@@ -19,17 +19,6 @@
 #include "read_img.hpp"
 
 
-// using nvinfer1::IHostMemory;
-// using nvinfer1::IBuilder;
-// using nvinfer1::INetworkDefinition;
-// using nvinfer1::ICudaEngine;
-// using nvinfer1::IInt8Calibrator;
-// using nvinfer1::IBuilderConfig;
-// using nvinfer1::IRuntime;
-// using nvinfer1::IExecutionContext;
-// using nvinfer1::ILogger;
-// using nvinfer1::Dims;
-// using Severity = nvinfer1::ILogger::Severity;
 
 using std::string;
 using std::ios;
