@@ -38,9 +38,9 @@ def get_data_loader(cfg, mode='train'):
             n_train_imgs = cfg.ims_per_gpu * dist.get_world_size() * cfg.max_iter
             sampler = RepeatedDistSampler(ds, n_train_imgs, shuffle=shuffle)
         else:
-            sampler = torch.utils.data.distributed.DistributedSampler(
+            sampler = torch.utils.data.DistributedSampler(
                 ds, shuffle=shuffle)
-        batchsampler = torch.utils.data.sampler.BatchSampler(
+        batchsampler = torch.utils.data.BatchSampler(
             sampler, batchsize, drop_last=drop_last
         )
         dl = DataLoader(
