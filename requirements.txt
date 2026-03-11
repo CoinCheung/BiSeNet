@@ -6,3 +6,4 @@ tensorboard==2.15.1
 pyyaml==6.0.1
 matplotlib==3.8.2
 scipy==1.11.4
+tabulate
