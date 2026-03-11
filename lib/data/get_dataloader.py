@@ -1,4 +1,3 @@
-
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.distributed as dist
@@ -10,8 +9,7 @@ from lib.data.cityscapes_cv2 import CityScapes
 from lib.data.coco import CocoStuff
 from lib.data.ade20k import ADE20k
 from lib.data.customer_dataset import CustomerDataset
-
-
+from .water_dataset import WaterDataset
 
 
 
@@ -29,9 +27,22 @@ def get_data_loader(cfg, mode='train'):
         shuffle = False
         drop_last = False
 
-    ds = eval(cfg.dataset)(cfg.im_root, annpath, trans_func=trans_func, mode=mode)
+    # 修改：支持WaterDataset
+    if cfg.dataset == 'WaterDataset':
+        ds = WaterDataset(
+            im_root=cfg.im_root,
+            annpath=annpath,
+            trans_func=trans_func,
+            mode=mode
+        )
+        # 添加BiSeNet需要的属性
+        ds.n_cats = cfg.n_cats
+        ds.lb_ignore = 255
+    else:
+        ds = eval(cfg.dataset)(cfg.im_root, annpath, trans_func=trans_func, mode=mode)
 
-    if dist.is_initialized():
+    # 修改：Windows单卡模式，不使用分布式采样
+    if dist.is_initialized() and dist.get_world_size() > 1:
         assert dist.is_available(), "dist should be initialzed"
         if mode == 'train':
             assert not cfg.max_iter is None
@@ -46,7 +57,7 @@ def get_data_loader(cfg, mode='train'):
         dl = DataLoader(
             ds,
             batch_sampler=batchsampler,
-            num_workers=4,
+            num_workers=0,  # Windows必须设为0
             pin_memory=True,
         )
     else:
@@ -55,7 +66,7 @@ def get_data_loader(cfg, mode='train'):
             batch_size=batchsize,
             shuffle=shuffle,
             drop_last=drop_last,
-            num_workers=4,
+            num_workers=0,  # Windows必须设为0
             pin_memory=True,
         )
     return dl

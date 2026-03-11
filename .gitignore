@@ -114,7 +114,7 @@ datasets/coco/val.txt
 datasets/ade20k/train.txt
 datasets/ade20k/val.txt
 pretrained/*
-run.sh
+# run.sh
 openvino/build/*
 openvino/output*
 ncnn/models/*
@@ -125,3 +125,5 @@ log*txt
 000000320425.jpg
 
 tvm/
+
+datasets/water_seg
