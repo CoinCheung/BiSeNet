@@ -146,9 +146,9 @@ bool ArgMaxPlugin::supportsFormatCombination(
 
     bool formatOK = fmt == PluginFormat::kLINEAR
                  || fmt == PluginFormat::kHWC
-                 || (fmt == PluginFormat::kHWC4 && typ == DataType::kINT8)
-                 || (fmt == PluginFormat::kHWC4 && typ == DataType::kFLOAT)
-                 || (fmt == PluginFormat::kHWC4 && typ == DataType::kHALF)
+                 || (fmt == PluginFormat::kDLA_HWC4 && typ == DataType::kINT8)
+                 || (fmt == PluginFormat::kDLA_HWC4 && typ == DataType::kFLOAT)
+                 || (fmt == PluginFormat::kDLA_HWC4 && typ == DataType::kHALF)
                  || (fmt == PluginFormat::kHWC8 && typ == DataType::kHALF);
 
     return formatOK && typeOk;
@@ -215,7 +215,7 @@ int32_t ArgMaxPlugin::enqueue(PluginTensorDesc const* inputDesc, PluginTensorDes
 
     auto fmt = inputDesc[0].format;
     bool is_nhwc  = (fmt == nvinfer1::TensorFormat::kHWC);
-    bool is_nhwc4 = (fmt == nvinfer1::TensorFormat::kHWC4);
+    bool is_nhwc4 = (fmt == nvinfer1::TensorFormat::kDLA_HWC4);
     bool is_nhwc8 = (fmt == nvinfer1::TensorFormat::kHWC8);
     int32_t n_spatial = n_size * m_size; // N * H * W, used by NHWC kernels
 
