@@ -101,6 +101,10 @@ def set_optimizer(model):
 
 
 def set_model_dist(net):
+    """
+    Set the model to distributed mode.
+    Is not required in the case of single GPU training.
+    """
     local_rank = int(os.environ['LOCAL_RANK'])
     net = nn.parallel.DistributedDataParallel(
         net,
