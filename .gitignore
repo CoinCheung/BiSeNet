@@ -125,3 +125,27 @@ log*txt
 000000320425.jpg
 
 tvm/
+
+# RUGD generated dataset
+datasets/rugd4/images/
+datasets/rugd4/labels/
+
+# Training artifacts
+experiments/
+res.jpg
+
+# Model and deployment artifacts
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.rknn
+*.engine
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Runtime files
+*.log
+.DS_Store
