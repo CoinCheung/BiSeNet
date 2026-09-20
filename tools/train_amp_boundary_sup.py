@@ -30,6 +30,11 @@ from lib.lr_scheduler import WarmupPolyLrScheduler
 from lib.meters import TimeMeter, AvgMeter
 from lib.logger import setup_logger, log_msg
 
+from lib.boundary_supervision import (
+    semantic_to_boundary,
+    boundary_bce_dice_loss,
+)
+
 
 
 ## fix all random seeds
@@ -177,16 +182,61 @@ def set_model_dist(net):
 
 def set_meters():
     time_meter = TimeMeter(cfg.max_iter)
-    loss_meter = AvgMeter('loss')
-    loss_pre_meter = AvgMeter('loss_prem')
-    loss_aux_meters = [AvgMeter('loss_aux{}'.format(i))
-            for i in range(cfg.num_aux_heads)]
-    return time_meter, loss_meter, loss_pre_meter, loss_aux_meters
+
+    loss_meter = AvgMeter(
+        'loss'
+    )
+
+    loss_pre_meter = AvgMeter(
+        'loss_prem'
+    )
+
+    loss_aux_meters = [
+        AvgMeter(
+            'loss_aux{}'.format(i)
+        )
+        for i in range(
+            cfg.num_aux_heads
+        )
+    ]
+
+    # Experiment B:
+    # 用于统计 Boundary Loss
+    boundary_loss_meter = AvgMeter(
+        'loss_boundary'
+    )
+
+    return (
+        time_meter,
+        loss_meter,
+        loss_pre_meter,
+        loss_aux_meters,
+        boundary_loss_meter,
+    )
 
 
 
 def train():
     logger = logging.getLogger()
+
+    if dist.get_rank() == 0:
+        logger.info(
+            "Experiment B Boundary Supervision:"
+        )
+    
+        logger.info(
+            f"  boundary_width="
+            f"{cfg.boundary_width}"
+        )
+    
+        logger.info(
+            f"  boundary_loss_weight="
+            f"{cfg.boundary_loss_weight}"
+        )
+    
+        logger.info(
+            "  boundary_loss=BCE+Dice"
+        )
 
     # Dataset
     dl = get_data_loader(cfg, mode="train")
@@ -274,10 +324,11 @@ def train():
         loss_meter,
         loss_pre_meter,
         loss_aux_meters,
+        boundary_loss_meter,
     ) = set_meters()
 
     amp_skipped_steps = 0
-    
+
     # Train loop
     for it, (im, lb) in enumerate(
         dl,
@@ -298,31 +349,135 @@ def train():
         optim.zero_grad(
             set_to_none=True
         )
-
+        
+        # ---------------------------------
+        # Boundary GT
+        # 不需要梯度，也不需要 AMP
+        # ---------------------------------
+        
+        with torch.no_grad():
+            (
+                boundary_target,
+                boundary_valid,
+            ) = semantic_to_boundary(
+                lb,
+                ignore_index=(
+                    dl.dataset.lb_ignore
+                ),
+                width=cfg.boundary_width,
+            )
+        # ---------------------------------
+        # 只打印第一个 batch 的
+        # boundary positive ratio
+        # --------------------------------
+        if (
+            it == start_iter
+            and dist.get_rank() == 0
+        ):
+            logger.info(
+                "boundary positive ratio: "
+                f"{boundary_target.mean().item():.6f}"
+            )
+        
+        
+        # ---------------------------------
+        # Forward + semantic losses
+        # ---------------------------------
+        
         with amp.autocast(
             "cuda",
             enabled=cfg.use_fp16,
         ):
-            logits, *logits_aux = net(im)
-
+            outputs = net(im)
+        
+            expected_outputs = (
+                cfg.num_aux_heads + 2
+            )
+        
+            if len(outputs) != expected_outputs:
+                raise RuntimeError(
+                    f"Expected {expected_outputs} outputs, "
+                    f"got {len(outputs)}"
+                )
+        
+            # Main semantic output
+            logits = outputs[0]
+        
+            # Auxiliary semantic outputs
+            logits_aux = outputs[
+                1:
+                1 + cfg.num_aux_heads
+            ]
+        
+            # Training-only boundary output
+            boundary_logits = outputs[-1]
+        
             loss_pre = criteria_pre(
                 logits,
                 lb,
             )
-
+        
             loss_aux = [
-                criterion(aux_logits, lb)
-                for criterion, aux_logits in zip(
+                crit(aux_logits, lb)
+                for crit, aux_logits
+                in zip(
                     criteria_aux,
                     logits_aux,
                 )
             ]
-
-            loss = (
-                loss_pre
-                + sum(loss_aux)
+        
+        
+        # ---------------------------------
+        # Boundary shape check
+        # ---------------------------------
+        
+        if (
+            boundary_logits.shape[-2:]
+            != boundary_target.shape[-2:]
+        ):
+            raise RuntimeError(
+                "Boundary shape mismatch: "
+                f"logits={tuple(boundary_logits.shape)}, "
+                f"target={tuple(boundary_target.shape)}"
             )
-
+        
+        
+        # ---------------------------------
+        # Boundary Loss
+        # 强制使用 FP32
+        # ---------------------------------
+        
+        with amp.autocast(
+            "cuda",
+            enabled=False,
+        ):
+            loss_boundary = (
+                boundary_bce_dice_loss(
+                    boundary_logits.float(),
+                    boundary_target.float(),
+                    boundary_valid.float(),
+                )
+            )
+        
+        
+        # ---------------------------------
+        # Total Loss
+        # ---------------------------------
+        
+        loss = (
+            loss_pre
+            + sum(loss_aux)
+            + (
+                cfg.boundary_loss_weight
+                * loss_boundary
+            )
+        )
+        
+        
+        # ---------------------------------
+        # Backward
+        # ---------------------------------
+        
         scaler.scale(
             loss
         ).backward()
@@ -341,29 +496,37 @@ def train():
             scaler.get_scale()
         )
         
+        # 如果 scale 下降，
+        # 表示本轮发生 overflow，
+        # optimizer.step 被跳过。
+        #
+        # 此时 scheduler 也不应该前进一步。
         if scale_after >= scale_before:
             lr_schdr.step()
-        
         else:
             amp_skipped_steps += 1
         
             if dist.get_rank() == 0:
                 logger.warning(
                     f"AMP overflow at iter {it + 1}, "
-                    f"scale {scale_before} -> "
-                    f"{scale_after}, "
-                    f"total skipped="
-                    f"{amp_skipped_steps}"
+                    f"scale {scale_before} -> {scale_after}"
                 )
-
+        
+        
+        # ---------------------------------
+        # Meters
+        # ---------------------------------
+        
         time_meter.update()
+        
         loss_meter.update(
             loss.item()
         )
+        
         loss_pre_meter.update(
             loss_pre.item()
         )
-
+        
         for meter, aux_loss in zip(
             loss_aux_meters,
             loss_aux,
@@ -371,11 +534,20 @@ def train():
             meter.update(
                 aux_loss.item()
             )
-
+        
+        boundary_loss_meter.update(
+            loss_boundary.item()
+        )
+        
+        
+        # ---------------------------------
+        # Logging
+        # ---------------------------------
+        
         if (it + 1) % 100 == 0:
-            lr_values = lr_schdr.get_lr()
-            lr = sum(lr_values) / len(lr_values)
-
+            lr = lr_schdr.get_lr()
+            lr = sum(lr) / len(lr)
+        
             msg = log_msg(
                 it,
                 cfg.max_iter,
@@ -385,7 +557,16 @@ def train():
                 loss_pre_meter,
                 loss_aux_meters,
             )
-
+        
+            boundary_avg, _ = (
+                boundary_loss_meter.get()
+            )
+        
+            msg += (
+                f", loss_boundary: "
+                f"{boundary_avg:.4f}"
+            )
+        
             logger.info(msg)
 
         if (

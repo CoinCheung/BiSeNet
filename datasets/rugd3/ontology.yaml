@@ -1,0 +1,12 @@
+classes:
+  0: sky
+  1: traversable
+  2: non_traversable
+  255: ignore
+
+mapping_from_rugd4:
+  0: 0
+  1: 1
+  2: 2
+  3: 2
+  255: 255
