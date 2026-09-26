@@ -149,3 +149,7 @@ __pycache__/
 # Runtime files
 *.log
 .DS_Store
+
+# Generated RUGD3 dataset
+/datasets/rugd3/images
+/datasets/rugd3/labels/
