@@ -41,7 +41,7 @@ from lib.logger import setup_logger, log_msg
 #  torch.backends.cudnn.benchmark = True
 #  torch.multiprocessing.set_sharing_strategy('file_system')
 
-SEED = 123
+SEED = int(os.environ.get("EXPERIMENT_SEED", "123"))
 
 torch.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
