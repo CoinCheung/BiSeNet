@@ -104,6 +104,10 @@ refine_latency = benchmark(
     "bisenetv2_boundary_refine"
 )
 
+d_latency = benchmark(
+    "bisenetv2_boundary_full"
+)
+
 extra_latency = (
     refine_latency
     - baseline_latency

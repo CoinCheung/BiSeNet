@@ -13,6 +13,10 @@ from .bisenetv2_boundary_full import (
     BiSeNetV2BoundaryFull,
 )
 
+from .bisenetv2_boundary_full_bga import (
+    BiSeNetV2BoundaryFullBGA,
+)
+
 
 model_factory = {
     'bisenetv1': BiSeNetV1,
@@ -26,4 +30,7 @@ model_factory = {
 
     'bisenetv2_boundary_full':
         BiSeNetV2BoundaryFull,
+
+    'bisenetv2_boundary_full_bga':
+        BiSeNetV2BoundaryFullBGA,
 }
