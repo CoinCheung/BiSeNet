@@ -1,0 +1,26 @@
+{
+  "val": [
+    "trail-4",
+    "trail-5"
+  ],
+  "test": [
+    "trail",
+    "trail-10",
+    "trail-12",
+    "trail-14"
+  ],
+  "train": [
+    "creek",
+    "park-1",
+    "park-2",
+    "park-8",
+    "trail-11",
+    "trail-13",
+    "trail-15",
+    "trail-3",
+    "trail-6",
+    "trail-7",
+    "trail-9",
+    "village"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "train": {
+    "images": 4894,
+    "expected_non_traversable_pixels": 941371518,
+    "actual_non_traversable_pixels": 941371518,
+    "difference": 0
+  },
+  "val": {
+    "images": 1134,
+    "expected_non_traversable_pixels": 200535920,
+    "actual_non_traversable_pixels": 200535920,
+    "difference": 0
+  },
+  "test": {
+    "images": 1408,
+    "expected_non_traversable_pixels": 253758408,
+    "actual_non_traversable_pixels": 253758408,
+    "difference": 0
+  }
+}

@@ -10,6 +10,8 @@ from lib.data.cityscapes_cv2 import CityScapes
 from lib.data.coco import CocoStuff
 from lib.data.ade20k import ADE20k
 from lib.data.customer_dataset import CustomerDataset
+from lib.data.rugd4_dataset import RUGD4Dataset
+from lib.data.rugd3_dataset import RUGD3Dataset
 
 
 
