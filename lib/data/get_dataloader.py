@@ -29,6 +29,12 @@ def get_data_loader(cfg, mode='train'):
         annpath = cfg.val_im_anns
         shuffle = False
         drop_last = False
+    elif mode == 'raw':
+        trans_func = T.TransformationExport(cfg.cropsize)
+        batchsize = 1
+        annpath = cfg.val_im_anns
+        shuffle = False
+        drop_last = False
 
     ds = eval(cfg.dataset)(cfg.im_root, annpath,
                            trans_func=trans_func, mode=mode)
