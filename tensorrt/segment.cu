@@ -13,6 +13,7 @@
 #include <array>
 #include <sstream>
 #include <random>
+#include <cstdint>
 #include <unordered_map>
 
 #include "trt_dep.hpp"
@@ -50,9 +51,9 @@ int main(int argc, char* argv[]) {
 
     if (args[0] == "compile") {
         stringstream ss;
-        ss << "usage is: ./segment compile input.onnx output.trt [--fp16|--fp32|--bf16|--fp8]\n"
-            << "or ./segment compile input.onnx output.trt --int8 /path/to/data_root /path/to/ann_file\n";
-        CHECK (argc >= 5, ss.str());
+        ss << "usage is: ./segment compile input.onnx output.trt [opt_batch_size]\n"
+            << "strongly typed: the precision comes from the onnx\n";
+        CHECK (argc >= 4, ss.str());
         compile_onnx(args);
     } else if (args[0] == "run") {
         CHECK (argc >= 5, "usage is ./segment run ./xxx.trt input.jpg result.jpg");
@@ -69,36 +70,13 @@ int main(int argc, char* argv[]) {
 
 
 void compile_onnx(vector<string> args) {
-
-    string quant("fp32");
-    string data_root("none");
-    string data_file("none");
-    int opt_bsize = 1;
-
-    std::unordered_map<string, string> quant_map{
-        {"--fp32", "fp32"},
-        {"--fp16", "fp16"},
-        {"--bf16", "bf16"},
-        {"--fp8",  "fp8"},
-        {"--int8", "int8"},
-    };
-    CHECK (quant_map.find(args[3]) != quant_map.end(),
-        "invalid args of quantization: " + args[3]); 
-    quant = quant_map[args[3]];
-    if (quant == "int8") {
-        data_root = args[4];
-        data_file = args[5];
-    }
-
-    if (args[3] == "--int8") {
-        if (args.size() > 6) opt_bsize = std::stoi(args[6]);
-    } else {
-        if (args.size() > 4) opt_bsize = std::stoi(args[4]);
-    }
+    CHECK (args.size() < 4 || args[3].rfind("--", 0) != 0,
+        "precision flags were removed: the precision comes from the onnx");
+    int opt_bsize = args.size() > 3 ? std::stoi(args[3]) : 1;
 
     SemanticSegmentTrt ss_trt;
     ss_trt.set_opt_batch_size(opt_bsize);
-    ss_trt.parse_to_engine(args[1], quant, data_root, data_file);
+    ss_trt.parse_to_engine(args[1]);
     ss_trt.serialize(args[2]);
 }
 
@@ -111,16 +89,17 @@ void run_with_trt(vector<string> args) {
     vector<int> i_dims = ss_trt.get_input_shape();
     vector<int> o_dims = ss_trt.get_output_shape();
 
-    const int iH{i_dims[2]}, iW{i_dims[3]};
+    // the network takes NHWC uint8 now, so H and W are dims 1 and 2
+    const int iH{i_dims[1]}, iW{i_dims[2]};
     const int oH{o_dims[1]}, oW{o_dims[2]};
 
-    // prepare image and resize
-    vector<float> data; data.resize(iH * iW * 3);
+    // read straight into the engine's pinned host buffer, no extra copy
+    ss_trt.setup_context(1);
     int orgH, orgW;
-    read_data(args[2], &data[0], iH, iW, orgH, orgW);
+    read_data(args[2], ss_trt.input_buffer(), iH, iW, orgH, orgW);
 
     // call engine
-    vector<int32_t> res = ss_trt.inference(data);
+    vector<int32_t> res = ss_trt.inference();
 
     // generate colored out
     vector<vector<uint8_t>> color_map = get_color_map();
@@ -141,7 +120,7 @@ void run_with_trt(vector<string> args) {
 
     // resize back and save
     if ((orgH != oH) || (orgW != oW)) {
-        cv::resize(pred, pred, cv::Size(orgW, orgH), cv::INTER_CUBIC);
+        cv::resize(pred, pred, cv::Size(orgW, orgH), 0, 0, cv::INTER_LINEAR);
     }
     cv::imwrite(args[3], pred);
 }
@@ -167,5 +146,6 @@ void test_speed(vector<string> args) {
     SemanticSegmentTrt ss_trt;
     ss_trt.set_opt_batch_size(opt_bsize);
     ss_trt.deserialize(args[1]);
-    ss_trt.test_speed_fps();
+    ss_trt.test_speed_fps(false);   // kernel only, comparable with earlier numbers
+    ss_trt.test_speed_fps(true);    // what a deployment actually pays
 }
