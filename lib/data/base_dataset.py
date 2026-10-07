@@ -19,7 +19,7 @@ class BaseDataset(Dataset):
     '''
     def __init__(self, dataroot, annpath, trans_func, mode='train'):
         super(BaseDataset, self).__init__()
-        assert mode in ('train', 'val', 'test')
+        assert mode in ('train', 'val', 'test', 'raw')
         self.mode = mode
         self.trans_func = trans_func
 

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <cstdint>
 
 
 using std::cout;
@@ -18,9 +19,9 @@ using std::string;
 using cv::Mat;
 
 
-void read_data(std::string impth, float *data, 
+void read_data(std::string impth, uint8_t *data,
         int iH, int iW, int& orgH, int& orgW);
-void read_data(std::string impth, float *data, int iH, int iW);
+void read_data(std::string impth, uint8_t *data, int iH, int iW);
 
 
 #endif 
