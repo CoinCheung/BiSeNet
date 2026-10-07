@@ -46,10 +46,7 @@ def get_func(inpth, in_q, done):
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # type is float
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    to_tensor = T.ToTensor(
-        mean=(0.3257, 0.3690, 0.3223), # city, rgb
-        std=(0.2112, 0.2148, 0.2115),
-    )
+    to_tensor = T.ToTensor(cfg.img_mean, cfg.img_std)
 
     while cap.isOpened():
         ret, frame = cap.read()

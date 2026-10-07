@@ -17,7 +17,7 @@ import numpy as np
 class BaseDataset(Dataset):
     '''
     '''
-    def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
+    def __init__(self, dataroot, annpath, trans_func, mode='train'):
         super(BaseDataset, self).__init__()
         assert mode in ('train', 'val', 'test')
         self.mode = mode
@@ -43,9 +43,7 @@ class BaseDataset(Dataset):
         if not self.lb_map is None:
             label = self.lb_map[label]
         im_lb = dict(im=img, lb=label)
-        if not self.trans_func is None:
-            im_lb = self.trans_func(im_lb)
-        im_lb = self.to_tensor(im_lb)
+        im_lb = self.trans_func(im_lb)
         img, label = im_lb['im'], im_lb['lb']
         return img.detach(), label.unsqueeze(0).detach()
 

@@ -17,19 +17,21 @@ from lib.data.customer_dataset import CustomerDataset
 
 def get_data_loader(cfg, mode='train'):
     if mode == 'train':
-        trans_func = T.TransformationTrain(cfg.scales, cfg.cropsize)
+        trans_func = T.TransformationTrain(cfg.scales, cfg.cropsize,
+                                           cfg.img_mean, cfg.img_std)
         batchsize = cfg.ims_per_gpu
         annpath = cfg.train_im_anns
         shuffle = True
         drop_last = True
     elif mode == 'val':
-        trans_func = T.TransformationVal()
+        trans_func = T.TransformationVal(cfg.img_mean, cfg.img_std)
         batchsize = cfg.eval_ims_per_gpu
         annpath = cfg.val_im_anns
         shuffle = False
         drop_last = False
 
-    ds = eval(cfg.dataset)(cfg.im_root, annpath, trans_func=trans_func, mode=mode)
+    ds = eval(cfg.dataset)(cfg.im_root, annpath,
+                           trans_func=trans_func, mode=mode)
 
     if dist.is_initialized():
         assert dist.is_available(), "dist should be initialzed"

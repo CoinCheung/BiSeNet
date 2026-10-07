@@ -11,7 +11,6 @@ import torch.distributed as dist
 import cv2
 import numpy as np
 
-import lib.data.transform_cv2 as T
 from lib.data.base_dataset import BaseDataset
 
 '''
@@ -25,16 +24,11 @@ proportion of each class label pixels:
 
 class ADE20k(BaseDataset):
 
-    def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
+    def __init__(self, dataroot, annpath, trans_func, mode='train'):
         super(ADE20k, self).__init__(
                 dataroot, annpath, trans_func, mode)
         self.n_cats = 150
         self.lb_ignore = 255
         self.lb_map = np.arange(200) - 1 # label range from 1 to 149, 0 is ignored
         self.lb_map[0] = 255
-
-        self.to_tensor = T.ToTensor(
-            mean=(0.49343230, 0.46819794,  0.43106043), # ade20k, rgb
-            std=(0.25680755, 0.25506608, 0.27422913),
-        )
 

@@ -40,10 +40,7 @@ net.eval()
 net.cuda()
 
 # prepare data
-to_tensor = T.ToTensor(
-    mean=(0.3257, 0.3690, 0.3223), # city, rgb
-    std=(0.2112, 0.2148, 0.2115),
-)
+to_tensor = T.ToTensor(cfg.img_mean, cfg.img_std)
 im = cv2.imread(args.img_path)[:, :, ::-1]
 im = to_tensor(dict(im=im, lb=None))['im'].unsqueeze(0).cuda()
 
