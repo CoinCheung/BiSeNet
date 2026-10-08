@@ -309,16 +309,6 @@ class SegmentHead(nn.Module):
         return feat
 
 
-class CustomArgMax(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, feat_out, dim):
-        return feat_out.argmax(dim=dim).int()
-
-    @staticmethod
-    def symbolic(g, feat_out, dim: int):
-        return g.op('CustomArgMax', feat_out, dim_i=dim)
-
 
 class BiSeNetV2(nn.Module):
 
@@ -355,8 +345,7 @@ class BiSeNetV2(nn.Module):
         elif self.aux_mode == 'eval':
             return logits,
         elif self.aux_mode == 'pred':
-            #  pred = logits.argmax(dim=1)
-            pred = CustomArgMax.apply(logits, 1)
+            pred = logits.argmax(dim=1)
             return pred
         else:
             raise NotImplementedError

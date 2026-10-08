@@ -10,6 +10,26 @@ import cv2
 import torch
 
 
+class Resize(object):
+    '''
+    size should be a tuple of (H, W)
+    '''
+    def __init__(self, size=(384, 384)):
+        self.size = size
+
+    def __call__(self, im_lb):
+        if self.size is None:
+            return im_lb
+
+        im, lb = im_lb['im'], im_lb['lb']
+        assert im.shape[:2] == lb.shape[:2]
+
+        H, W = self.size
+        im = cv2.resize(im, (W, H))
+        lb = cv2.resize(lb, (W, H), interpolation=cv2.INTER_NEAREST)
+
+        return dict(im=im, lb=lb)
+
 
 class RandomResizedCrop(object):
     '''
@@ -178,6 +198,21 @@ class TransformationVal(object):
     def __call__(self, im_lb):
         return self.to_tensor(im_lb)
 
+
+class TransformationExport(object):
+
+    def __init__(self, size):
+        self.trans_func = Compose([
+            Resize(size),
+        ])
+
+    def __call__(self, im_lb):
+        im_lb = self.trans_func(im_lb)
+        im, lb = im_lb['im'], im_lb['lb']
+        im = torch.from_numpy(im)
+        if not lb is None:
+            lb = torch.from_numpy(lb.astype(np.int64).copy()).clone()
+        return dict(im=im, lb=lb)
 
 
 if __name__ == '__main__':
