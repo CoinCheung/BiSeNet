@@ -121,7 +121,7 @@ class ColorJitter(object):
 
 class ToTensor(object):
     '''
-    mean and std should be of the channel order 'bgr'
+    mean and std should be of the channel order 'rgb'
     '''
     def __init__(self, mean=(0, 0, 0), std=(1., 1., 1.)):
         self.mean = mean
@@ -153,7 +153,7 @@ class Compose(object):
 
 class TransformationTrain(object):
 
-    def __init__(self, scales, cropsize):
+    def __init__(self, scales, cropsize, img_mean, img_std):
         self.trans_func = Compose([
             RandomResizedCrop(scales, cropsize),
             RandomHorizontalFlip(),
@@ -162,6 +162,7 @@ class TransformationTrain(object):
                 contrast=0.4,
                 saturation=0.4
             ),
+            ToTensor(img_mean, img_std),
         ])
 
     def __call__(self, im_lb):
@@ -171,9 +172,11 @@ class TransformationTrain(object):
 
 class TransformationVal(object):
 
+    def __init__(self, img_mean, img_std):
+        self.to_tensor = ToTensor(img_mean, img_std)
+
     def __call__(self, im_lb):
-        im, lb = im_lb['im'], im_lb['lb']
-        return dict(im=im, lb=lb)
+        return self.to_tensor(im_lb)
 
 
 

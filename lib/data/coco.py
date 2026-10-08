@@ -11,7 +11,6 @@ import torch.distributed as dist
 import cv2
 import numpy as np
 
-import lib.data.transform_cv2 as T
 from lib.data.base_dataset import BaseDataset
 
 '''
@@ -46,7 +45,7 @@ from lib.data.base_dataset import BaseDataset
 
 class CocoStuff(BaseDataset):
 
-    def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
+    def __init__(self, dataroot, annpath, trans_func, mode='train'):
         super(CocoStuff, self).__init__(
                 dataroot, annpath, trans_func, mode)
         self.n_cats = 171 # 91 stuff, 91 thing, 11 of thing have no annos
@@ -58,10 +57,5 @@ class CocoStuff(BaseDataset):
         self.lb_map = np.arange(256)
         for ind in remain:
             self.lb_map[ind] = remain.index(ind)
-
-        self.to_tensor = T.ToTensor(
-            mean=(0.46962251, 0.4464104,  0.40718787), # coco, rgb
-            std=(0.27469736, 0.27012361, 0.28515933),
-        )
 
 
