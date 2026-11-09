@@ -320,7 +320,7 @@ class BiSeNetV2(nn.Module):
         self.bga = BGALayer()
 
         ## TODO: what is the number of mid chan ?
-        self.head = SegmentHead(128, 1024, n_classes, up_factor=8, aux=False)
+        self.head = SegmentHead(128, 256, n_classes, up_factor=8, aux=False)
         if self.aux_mode == 'train':
             self.aux2 = SegmentHead(16, 128, n_classes, up_factor=4)
             self.aux3 = SegmentHead(32, 128, n_classes, up_factor=8)

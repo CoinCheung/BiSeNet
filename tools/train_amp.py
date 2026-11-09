@@ -147,6 +147,14 @@ def train():
         max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
         warmup_ratio=0.1, warmup='exp', last_epoch=-1,)
 
+    def forward_loss(im, lb):
+        logits, *logits_aux = net(im)
+        loss_pre = criteria_pre(logits, lb)
+        loss_aux = [crit(lgt, lb) for crit, lgt in zip(criteria_aux, logits_aux)]
+        loss = loss_pre + sum(loss_aux)
+        return loss, loss_pre, loss_aux
+    forward_loss = torch.compile(forward_loss)
+
     ## train loop
     for it, (im, lb) in enumerate(dl):
         im = im.cuda()
@@ -156,10 +164,7 @@ def train():
 
         optim.zero_grad()
         with amp.autocast(enabled=cfg.use_fp16):
-            logits, *logits_aux = net(im)
-            loss_pre = criteria_pre(logits, lb)
-            loss_aux = [crit(lgt, lb) for crit, lgt in zip(criteria_aux, logits_aux)]
-            loss = loss_pre + sum(loss_aux)
+            loss, loss_pre, loss_aux = forward_loss(im, lb)
         scaler.scale(loss).backward()
         scaler.step(optim)
         scaler.update()
