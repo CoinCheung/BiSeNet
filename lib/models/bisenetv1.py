@@ -269,7 +269,7 @@ class BiSeNetV1(nn.Module):
         self.cp = ContextPath()
         self.sp = SpatialPath()
         self.ffm = FeatureFusionModule(256, 256)
-        self.conv_out = BiSeNetOutput(256, 256, n_classes, up_factor=8)
+        self.conv_out = BiSeNetOutput(256, 128, n_classes, up_factor=8)
         self.aux_mode = aux_mode
         if self.aux_mode == 'train':
             self.conv_out16 = BiSeNetOutput(128, 64, n_classes, up_factor=8)

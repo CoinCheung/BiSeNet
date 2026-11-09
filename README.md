@@ -6,20 +6,20 @@ My implementation of [BiSeNetV1](https://arxiv.org/abs/1808.00897) and [BiSeNetV
 mIOUs and fps on cityscapes val set:
 | none | ss | ssc | msf | mscf | fps(fp32/fp16/int8) | link |
 |------|:--:|:---:|:---:|:----:|:---:|:----:|
-| bisenetv1 | 75.44 | 76.94 | 77.45 | 78.86 | 71/165/426 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_city_new.pth) |
-| bisenetv2 | 74.95 | 75.58 | 76.53 | 77.08 | 72/171/108 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_city.pth) |
+| bisenetv1 | 74.74 | 76.12 | 76.90 | 78.36 | 71/165/426 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_city.pth) |
+| bisenetv2 | 74.52 | 75.55 | 76.49 | 77.16 | 72/171/108 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_city.pth) |
 
 mIOUs on cocostuff val2017 set:
 | none | ss | ssc | msf | mscf | link |
 |------|:--:|:---:|:---:|:----:|:----:|
-| bisenetv1 | 31.49 | 31.42 | 32.46 | 32.55 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_coco_new.pth) |
-| bisenetv2 | 30.49 | 30.55 | 31.81 | 31.73 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_coco.pth) |
+| bisenetv1 | 34.30 | 34.20 | 35.43 | 35.49 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_coco.pth) |
+| bisenetv2 | 29.92 | 29.74 | 31.08 | 30.81 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_coco.pth) |
 
 mIOUs on ade20k val set:
 | none | ss | ssc | msf | mscf | link |
 |------|:--:|:---:|:---:|:----:|:----:|
-| bisenetv1 | 36.15 | 36.04 | 37.27 | 36.58 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v1_ade20k.pth) |
-| bisenetv2 | 32.53 | 32.43 | 33.23 | 31.72 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.0.0/model_final_v2_ade20k.pth) |
+| bisenetv1 | 35.86 | 35.70 | 37.20 | 36.65 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_ade20k.pth) |
+| bisenetv2 | 33.42 | 33.16 | 34.44 | 33.49 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_ade20k.pth) |
 
 Tips: 
 
@@ -29,9 +29,7 @@ Tips:
 
 3. The authors of bisenetv2 used cocostuff-10k, while I used cocostuff-123k(do not know how to say, just same 118k train and 5k val images as object detection). Thus the results maybe different from paper. 
 
-4. The authors did not report results on ade20k, thus there is no official training settings, here I simply provide a "make it work" result. Maybe the results on ade20k can be boosted with better settings.
-
-5. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 on cityscapes for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. 
+4. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 on cityscapes for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. Thus the numbers above are the mean of many runs: 32 runs for cocostuff and bisenetv2 on ade20k, and 8 runs for the others. 
 
 
 ## deploy trained models
@@ -53,12 +51,12 @@ Triton Inference Server(TIS) provides a service solution of deployment. You can 
 
 My platform is like this: 
 
-* ubuntu 18.04
-* nvidia Tesla T4 gpu, driver 450.80.02
-* cuda 10.2/11.3
-* cudnn 8
-* miniconda python 3.8.8
-* pytorch 1.11.0
+* ubuntu 24.04
+* nvidia A40 gpu
+* cuda 12.6
+* cudnn 9
+* miniconda python 3.12
+* pytorch 2.12
 
 
 ## get start
@@ -142,17 +140,15 @@ Then you need to change the field of `im_root` and `train/val_im_anns` in the co
 
 Training commands I used to train the models can be found in [here](./dist_train.sh).
 
-Note:  
-1. though `bisenetv2` has fewer flops, it requires much more training iterations. The the training time of `bisenetv1` is shorter.
-2. I used overall batch size of 16 to train all models. Since cocostuff has 171 categories, it requires more memory to train models on it. I split the 16 images into more gpus than 2, as I do with cityscapes.
+Note: I trained all models on a single gpu, with batch size of 16 on cityscapes, and 32 on cocostuff and ade20k.
 
 
 ## finetune from trained model
 
 You can also load the trained model weights and finetune from it, like this:
 ```
-$ export CUDA_VISIBLE_DEVICES=0,1
-$ torchrun --nproc_per_node=2 tools/train_amp.py --finetune-from ./res/model_final.pth --config ./configs/bisenetv2_city.py # or bisenetv1
+$ export CUDA_VISIBLE_DEVICES=0
+$ torchrun --nproc_per_node=1 tools/train_amp.py --finetune-from ./res/model_final.pth --config ./configs/bisenetv2_city.py # or bisenetv1
 ```
 
 
