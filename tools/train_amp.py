@@ -24,6 +24,7 @@ from configs import set_cfg_from_file
 from lib.data import get_data_loader
 from evaluate import eval_model
 from lib.ohem_ce_loss import OhemCELoss
+from lib.lion import Lion
 from lib.lr_scheduler import WarmupPolyLrScheduler
 from lib.meters import TimeMeter, AvgMeter
 from lib.logger import setup_logger, log_msg
@@ -91,12 +92,21 @@ def set_optimizer(model):
             {'params': wd_params, },
             {'params': non_wd_params, 'weight_decay': 0},
         ]
-    optim = torch.optim.SGD(
-        params_list,
-        lr=cfg.lr_start,
-        momentum=0.9,
-        weight_decay=cfg.weight_decay,
-    )
+    optim_type = cfg.get('optim', 'sgd')
+    assert optim_type in ('sgd', 'lion')
+    if optim_type == 'lion':
+        optim = Lion(
+            params_list,
+            lr=cfg.lr_start,
+            weight_decay=cfg.weight_decay,
+        )
+    else:
+        optim = torch.optim.SGD(
+            params_list,
+            lr=cfg.lr_start,
+            momentum=0.9,
+            weight_decay=cfg.weight_decay,
+        )
     return optim
 
 
@@ -134,7 +144,10 @@ def train():
     optim = set_optimizer(net)
 
     ## mixed precision training
-    scaler = amp.GradScaler()
+    use_bf16 = cfg.get('use_bf16', False)
+    assert not (cfg.use_fp16 and use_bf16)
+    amp_dtype = torch.bfloat16 if use_bf16 else torch.float16
+    scaler = amp.GradScaler(enabled=cfg.use_fp16)
 
     ## ddp training
     net = set_model_dist(net)
@@ -163,7 +176,7 @@ def train():
         lb = torch.squeeze(lb, 1)
 
         optim.zero_grad()
-        with amp.autocast(enabled=cfg.use_fp16):
+        with amp.autocast(enabled=cfg.use_fp16 or use_bf16, dtype=amp_dtype):
             loss, loss_pre, loss_aux = forward_loss(im, lb)
         scaler.scale(loss).backward()
         scaler.step(optim)
