@@ -1,6 +1,6 @@
-# BiSeNetV1 & BiSeNetV2
+# BiSeNetV1 & BiSeNetV2 & BiSeNetM
 
-My implementation of [BiSeNetV1](https://arxiv.org/abs/1808.00897) and [BiSeNetV2](https://arxiv.org/abs/2004.02147).
+My implementation of [BiSeNetV1](https://arxiv.org/abs/1808.00897) and [BiSeNetV2](https://arxiv.org/abs/2004.02147), and a new model called BiSeNetM.
 
 
 mIOUs and fps on cityscapes val set:
@@ -8,18 +8,21 @@ mIOUs and fps on cityscapes val set:
 |------|:--:|:---:|:---:|:----:|:---:|:----:|
 | bisenetv1 | 74.74 | 76.12 | 76.90 | 78.36 | 71/165/426 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_city.pth) |
 | bisenetv2 | 74.52 | 75.55 | 76.49 | 77.16 | 72/171/108 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_city.pth) |
+| bisenetm | 77.87 | 78.43 | 79.60 | 80.43 | - | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.2.0/model_final_m_city.pth) |
 
 mIOUs on cocostuff val2017 set:
 | none | ss | ssc | msf | mscf | link |
 |------|:--:|:---:|:---:|:----:|:----:|
 | bisenetv1 | 34.30 | 34.20 | 35.43 | 35.49 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_coco.pth) |
 | bisenetv2 | 29.92 | 29.74 | 31.08 | 30.81 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_coco.pth) |
+| bisenetm | 37.38 | 37.55 | 38.68 | 39.20 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.2.0/model_final_m_coco.pth) |
 
 mIOUs on ade20k val set:
 | none | ss | ssc | msf | mscf | link |
 |------|:--:|:---:|:---:|:----:|:----:|
 | bisenetv1 | 35.86 | 35.70 | 37.20 | 36.65 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_ade20k.pth) |
 | bisenetv2 | 33.42 | 33.16 | 34.44 | 33.49 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_ade20k.pth) |
+| bisenetm | 39.55 | 39.97 | 40.20 | 41.07 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.2.0/model_final_m_ade20k.pth) |
 
 Tips: 
 
@@ -29,7 +32,7 @@ Tips:
 
 3. The authors of bisenetv2 used cocostuff-10k, while I used cocostuff-123k(do not know how to say, just same 118k train and 5k val images as object detection). Thus the results maybe different from paper. 
 
-4. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 on cityscapes for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. Thus the numbers above are the mean of many runs: 32 runs for cocostuff and bisenetv2 on ade20k, and 8 runs for the others. 
+4. The model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 on cityscapes for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 73.1-75.1. Thus the numbers above are the mean of many runs: 32 runs for bisenetv1 and bisenetv2 on cocostuff and bisenetv2 on ade20k, 16 runs for bisenetm on ade20k, and 8 runs for the others. 
 
 
 ## deploy trained models
