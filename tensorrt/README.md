@@ -7,9 +7,16 @@ This works with tensorrt 11, where the network is strongly typed: the precision 
 
 ### 1. Export onnx model
 
-Install the dependencies first:  
+My environment for exporting:  
+* python 3.12
+* pytorch 2.12.1
+* tensorrt 11.3.0.99
+* nvidia-modelopt 0.44.0
+* onnx 1.21.0, onnx_graphsurgeon 0.6.1, onnxoptimizer 0.4.2, onnxruntime-gpu 1.24.4
+
+Install the dependencies like this:  
 ```
-$ python -m pip install --extra-index-url https://pypi.nvidia.com --upgrade tensorrt nvidia-modelopt[all]
+$ python -m pip install --extra-index-url https://pypi.nvidia.com tensorrt==11.3.0.99 nvidia-modelopt[all]==0.44.0
 $ python -m pip install onnx onnx_graphsurgeon onnxoptimizer
 ```
 
@@ -36,6 +43,7 @@ With `--outpath ./model.onnx`, the following models are generated:
 | `*_fused.onnx` | the above models with the fused head, with `--fuse-head` |
 
 The model takes raw `uint8` images of shape `(N, H, W, 3)` in rgb order (`/255` and mean/std normalization are inside the model), and outputs `uint8` labels of shape `(N, H, W)`. The batch size `N` can be 1 to 4.  
+I recommend using the `*_fused.onnx`, which are much faster.
 
 
 ### 2. Using C++
@@ -43,10 +51,11 @@ The model takes raw `uint8` images of shape `(N, H, W, 3)` in rgb order (`/255` 
 #### 1. My platform
 
 * ubuntu 24.04
-* nvidia L4 gpu, driver 595.91.07
+* nvidia L4 gpu, driver 595.99.02
 * cuda 12.9
+* cudnn 9.10
 * cmake 3.28.3
-* opencv
+* opencv 4.6
 * tensorrt 11.3.0.99
 
 
@@ -93,6 +102,16 @@ This prints the fps twice: without and with the host-device copy of input and ou
 
 2. Cuda graph and pinned host memory are used by default. You can disable them with environment variables `TRT_NO_CUDA_GRAPH=1` and `TRT_NO_PINNED=1`.  
 
+3. The fps of the models on the platform above, with batch size 1, input size 1024x2048 and fused head:  
+
+| model | fp32 | fp16 | int8 (no autotune) | int8 (autotune) |
+|---|:---:|:---:|:---:|:---:|
+| bisenetv1 | 75.4 | 176.4 | 450.2 | 230.8 |
+| bisenetv2 | 88.8 | 219.1 | 136.7 | 133.6 |
+| bisenetm | 172.7 | 412.6 | 569.5 | 678.5 |
+
+Autotune does not always give a faster model, so you may try both.  
+
 
 
 ### 3. Using python
@@ -101,6 +120,7 @@ You can also use python script to compile and run inference of your model. Besid
 ```
 $ python -m pip install cuda-python opencv-python
 ```
+I used cuda-python 13.4.1.
 
 The script loads the fused head plugin from `tensorrt/build/plugins/fused_head/libfused_head_plugin.so` by default, so build it as in the C++ part first, or set its path with `--plugin /path/to/libfused_head_plugin.so` (before the sub command).  
 

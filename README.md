@@ -4,11 +4,11 @@ My implementation of [BiSeNetV1](https://arxiv.org/abs/1808.00897) and [BiSeNetV
 
 
 mIOUs and fps on cityscapes val set:
-| none | ss | ssc | msf | mscf | fps(fp32/fp16/int8) | link |
+| none | ss | ssc | msf | mscf | fps(fused head, fp32/fp16/int8) | link |
 |------|:--:|:---:|:---:|:----:|:---:|:----:|
-| bisenetv1 | 74.74 | 76.12 | 76.90 | 78.36 | 71/165/426 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_city.pth) |
-| bisenetv2 | 74.52 | 75.55 | 76.49 | 77.16 | 72/171/108 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_city.pth) |
-| bisenetm | 77.87 | 78.43 | 79.60 | 80.43 | - | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.2.0/model_final_m_city.pth) |
+| bisenetv1 | 74.74 | 76.12 | 76.90 | 78.36 | 75/176/450 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v1_city.pth) |
+| bisenetv2 | 74.52 | 75.55 | 76.49 | 77.16 | 89/219/137 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.1.0/model_final_v2_city.pth) |
+| bisenetm | 77.87 | 78.43 | 79.60 | 80.43 | 173/413/679 | [download](https://github.com/CoinCheung/BiSeNet/releases/download/0.2.0/model_final_m_city.pth) |
 
 mIOUs on cocostuff val2017 set:
 | none | ss | ssc | msf | mscf | link |
@@ -28,7 +28,7 @@ Tips:
 
 1. **ss** means single scale evaluation, **ssc** means single scale crop evaluation, **msf** means multi-scale evaluation with flip augment, and **mscf** means multi-scale crop evaluation with flip evaluation. The eval scales and crop size of multi-scales evaluation can be found in [configs](./configs/).
 
-2. The fps is tested in different way from the paper. For more information, please see [here](./tensorrt).
+2. The fps is tested on a nvidia L4 gpu with tensorrt, batch size 1 and input size 1024x2048. The int8 fps is the faster one of with and without autotune. For more information, please see [here](./tensorrt).
 
 3. The authors of bisenetv2 used cocostuff-10k, while I used cocostuff-123k(do not know how to say, just same 118k train and 5k val images as object detection). Thus the results maybe different from paper. 
 
