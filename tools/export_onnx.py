@@ -176,7 +176,8 @@ def fuse_head(onnx_path):
     Cast(int64) to preserve ArgMax's output type.
 
     Run this after quantization, so autotune never has to deal with a custom op.
-    Q/DQ pairs between the Resize and the ArgMax are bypassed; the rest of the
+    Q/DQ pairs between the Resize and the ArgMax, and the ones in front of the Resize
+    (they would quantize the logits of the head conv), are bypassed; the rest of the
     autotune result is kept.  The source file is not modified.
     """
     base, ext = osp.splitext(onnx_path)
@@ -237,6 +238,18 @@ def fuse_head(onnx_path):
     assert int(argmax.attrs.get("select_last_index", 0)) == 0, "ArgMax must pick the first maximum"
 
     src, idx = resize.inputs[0], argmax.outputs[0]
+    # Q -> DQ pairs in front of the Resize are bypassed as well: they would round the logits of the head conv to int8.
+    # The logits can have outliers (amax ~2000 on bisenetm, so one int8 step is ~19) which flattens them and the
+    # argmax collapses to one class (mIoU 73 -> 4), while autotune cannot see this (it only looks at the latency)
+    # and the default full quantization quantizes this tensor too.  The plugin reads the float logits instead.
+    # The Q/DQ nodes are left dangling and removed by cleanup(); if the Q is read by another node it stays for that node.
+    pre_pairs = 0
+    while src.inputs and src.inputs[0].op == "DequantizeLinear":
+        pdq = src.inputs[0]
+        pq = pdq.inputs[0].inputs[0] if pdq.inputs[0].inputs else None
+        assert pq is not None and pq.op == "QuantizeLinear", "DequantizeLinear before the Resize without a QuantizeLinear"
+        src = pq.inputs[0]
+        pre_pairs += 1
     casts = [n for n in g.nodes if idx in n.inputs and n.op == "Cast"]
     others = [n for n in g.nodes if idx in n.inputs and n.op != "Cast"]
     keep_int64 = bool(others) or idx in g.outputs
@@ -269,7 +282,8 @@ def fuse_head(onnx_path):
     tail = [f"Cast(to={onnx.TensorProto.DataType.Name(int(n.attrs['to']))})" for n in casts]
     tail += ["Cast(to=INT64)"] if keep_int64 else []
     print(f"fusing {src.name} {src.shape} -> FusedUpsampleArgMax(int32) -> {', '.join(tail) or 'nothing'}, "
-          f"scales=({sh},{sw})" + (f", bypassed {len(bypassed) // 2} Q/DQ pair(s) after the Resize" if bypassed else ""))
+          f"scales=({sh},{sw})" + (f", bypassed {len(bypassed) // 2} Q/DQ pair(s) after the Resize" if bypassed else "")
+          + (f", bypassed {pre_pairs} Q/DQ pair(s) before the Resize (head logits kept in float)" if pre_pairs else ""))
 
     g.cleanup().toposort()
     m = gs.export_onnx(g)
