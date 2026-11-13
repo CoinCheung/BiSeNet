@@ -153,3 +153,5 @@ __pycache__/
 # Generated RUGD3 dataset
 /datasets/rugd3/images
 /datasets/rugd3/labels/
+*.bak
+*.before_*
