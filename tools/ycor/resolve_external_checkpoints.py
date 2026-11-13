@@ -1,0 +1,561 @@
+#!/usr/bin/env python3
+
+import hashlib
+import json
+import re
+from pathlib import Path
+
+import torch
+
+
+BI_ROOT = Path(
+    "/root/autodl-tmp/projects/BiSeNet"
+).resolve()
+
+PID_ROOT = Path(
+    "/root/autodl-tmp/projects/PIDNet"
+).resolve()
+
+OUT = (
+    BI_ROOT /
+    "experiments/external_ycor_zero_shot/protocol"
+)
+
+OUT.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+
+BI_CASES = [
+    (
+        "A",
+        123,
+        BI_ROOT /
+        "experiments/rugd3_baseline_b16_seed123_formal",
+        60000,
+    ),
+    (
+        "A",
+        456,
+        BI_ROOT /
+        "experiments/rugd3_baseline_b16_seed456_formal",
+        35000,
+    ),
+    (
+        "A",
+        789,
+        BI_ROOT /
+        "experiments/rugd3_baseline_b16_seed789_formal",
+        None,
+    ),
+
+    (
+        "D-BGA",
+        123,
+        BI_ROOT /
+        "experiments/rugd3_boundary_full_bga_b16_seed123_formal",
+        55000,
+    ),
+    (
+        "D-BGA",
+        456,
+        BI_ROOT /
+        "experiments/rugd3_boundary_full_bga_b16_seed456_formal",
+        70000,
+    ),
+    (
+        "D-BGA",
+        789,
+        BI_ROOT /
+        "experiments/rugd3_boundary_full_bga_b16_seed789_formal",
+        None,
+    ),
+]
+
+
+PID_CASES = [
+    (
+        "PIDNet-S",
+        123,
+        65000,
+        PID_ROOT /
+        "output_rugd3/pidnet_s_rugd3_seed123_formal/checkpoint_iter_65000.pth",
+    ),
+    (
+        "PIDNet-S",
+        456,
+        40000,
+        PID_ROOT /
+        "output_rugd3/pidnet_s_rugd3_seed456_formal/checkpoint_iter_40000.pth",
+    ),
+    (
+        "PIDNet-S",
+        789,
+        50000,
+        PID_ROOT /
+        "output_rugd3/pidnet_s_rugd3_seed789_formal/checkpoint_iter_50000.pth",
+    ),
+]
+
+
+def file_sha256(path):
+    h = hashlib.sha256()
+
+    with open(path, "rb") as f:
+        for chunk in iter(
+            lambda: f.read(1024 * 1024),
+            b"",
+        ):
+            h.update(chunk)
+
+    return h.hexdigest()
+
+
+def tensor_dict_score(d):
+    if not isinstance(d, dict):
+        return -1
+
+    score = 0
+
+    for _, v in d.items():
+        if torch.is_tensor(v):
+            score += 1
+
+    return score
+
+
+def find_state_dict(obj):
+    """
+    Find the model state_dict without assuming a single
+    checkpoint serialization format.
+    """
+
+    if not isinstance(obj, dict):
+        raise RuntimeError(
+            f"Checkpoint root is not dict: {type(obj)}"
+        )
+
+    preferred = [
+        "model",
+        "state_dict",
+        "model_state_dict",
+        "net",
+        "network",
+    ]
+
+    for key in preferred:
+        v = obj.get(key)
+
+        if (
+            isinstance(v, dict)
+            and tensor_dict_score(v) > 10
+        ):
+            return v
+
+    if tensor_dict_score(obj) > 10:
+        return obj
+
+    candidates = []
+
+    for key, value in obj.items():
+
+        if not isinstance(value, dict):
+            continue
+
+        if key.lower() in {
+            "optimizer",
+            "optim",
+            "scheduler",
+            "lr_scheduler",
+        }:
+            continue
+
+        score = tensor_dict_score(value)
+
+        if score > 10:
+            candidates.append(
+                (
+                    score,
+                    key,
+                    value,
+                )
+            )
+
+    if not candidates:
+        raise RuntimeError(
+            "Could not locate model state_dict. "
+            f"Root keys={list(obj.keys())}"
+        )
+
+    candidates.sort(
+        key=lambda x: x[0],
+        reverse=True,
+    )
+
+    return candidates[0][2]
+
+
+def normalize_key(k):
+    prefixes = [
+        "module.",
+    ]
+
+    changed = True
+
+    while changed:
+        changed = False
+
+        for prefix in prefixes:
+            if k.startswith(prefix):
+                k = k[len(prefix):]
+                changed = True
+
+    return k
+
+
+def state_signature(path):
+    obj = torch.load(
+        path,
+        map_location="cpu",
+        weights_only=False,
+    )
+
+    state = find_state_dict(obj)
+
+    normalized = {}
+
+    for key, value in state.items():
+
+        if not torch.is_tensor(value):
+            continue
+
+        key = normalize_key(
+            str(key)
+        )
+
+        normalized[key] = value
+
+    h = hashlib.sha256()
+
+    for key in sorted(normalized):
+
+        t = (
+            normalized[key]
+            .detach()
+            .cpu()
+            .contiguous()
+        )
+
+        h.update(
+            key.encode("utf-8")
+        )
+
+        h.update(
+            str(t.dtype).encode("utf-8")
+        )
+
+        h.update(
+            str(tuple(t.shape)).encode("utf-8")
+        )
+
+        # State dicts contain 0-D scalar tensors such as
+        # BatchNorm num_batches_tracked (torch.int64, shape=()).
+        # Flatten first so dtype reinterpretation as raw bytes also
+        # works for scalar tensors.
+        raw = (
+            t.reshape(-1)
+            .view(torch.uint8)
+            .numpy()
+            .tobytes()
+        )
+
+        h.update(raw)
+
+    return (
+        h.hexdigest(),
+        len(normalized),
+    )
+
+
+def iter_from_path(path):
+    m = re.search(
+        r"checkpoint_iter_(\d+)\.pth$",
+        path.name,
+    )
+
+    if not m:
+        return None
+
+    return int(
+        m.group(1)
+    )
+
+
+records = []
+
+
+print("=" * 100)
+print("RESOLVE BISENET BEST CHECKPOINTS")
+print("=" * 100)
+
+
+for (
+    model,
+    seed,
+    exp_dir,
+    expected_iter,
+) in BI_CASES:
+
+    best = exp_dir / "best_model.pth"
+
+    if not best.is_file():
+        raise RuntimeError(
+            f"Missing best_model: {best}"
+        )
+
+    best_sig, best_tensor_count = (
+        state_signature(best)
+    )
+
+    matches = []
+
+    candidates = sorted(
+        exp_dir.glob(
+            "checkpoint_iter_*.pth"
+        ),
+        key=lambda p:
+            iter_from_path(p)
+            or -1,
+    )
+
+    if not candidates:
+        raise RuntimeError(
+            f"No checkpoints in {exp_dir}"
+        )
+
+    for ckpt in candidates:
+
+        sig, tensor_count = (
+            state_signature(ckpt)
+        )
+
+        if (
+            sig == best_sig
+            and tensor_count
+            == best_tensor_count
+        ):
+            matches.append(ckpt)
+
+    if len(matches) != 1:
+
+        raise RuntimeError(
+            f"{model} seed{seed}: expected exactly "
+            f"one checkpoint matching best_model, "
+            f"found {len(matches)}:\n"
+            + "\n".join(
+                str(x)
+                for x in matches
+            )
+        )
+
+    matched = matches[0]
+
+    best_iter = iter_from_path(
+        matched
+    )
+
+    if (
+        expected_iter is not None
+        and best_iter != expected_iter
+    ):
+        raise RuntimeError(
+            f"{model} seed{seed}: "
+            f"discovered best={best_iter}, "
+            f"expected frozen={expected_iter}"
+        )
+
+    print(
+        f"{model:<8} "
+        f"seed={seed} "
+        f"best_iter={best_iter} "
+        f"tensor_count={best_tensor_count}"
+    )
+
+    print(
+        "  best_model:",
+        best,
+    )
+
+    print(
+        "  matched_ckpt:",
+        matched,
+    )
+
+    records.append(
+        {
+            "model": model,
+            "seed": seed,
+            "best_iter": best_iter,
+
+            # Use best_model for BiSeNet inference.
+            "eval_path":
+                str(best),
+
+            "matched_training_checkpoint":
+                str(matched),
+
+            "eval_file_sha256":
+                file_sha256(best),
+
+            "matched_checkpoint_sha256":
+                file_sha256(matched),
+
+            "model_state_sha256":
+                best_sig,
+
+            "tensor_count":
+                best_tensor_count,
+        }
+    )
+
+
+print()
+print("=" * 100)
+print("FREEZE PIDNET-S CHECKPOINTS")
+print("=" * 100)
+
+
+for (
+    model,
+    seed,
+    best_iter,
+    ckpt,
+) in PID_CASES:
+
+    if not ckpt.is_file():
+        raise RuntimeError(
+            f"Missing PIDNet checkpoint: {ckpt}"
+        )
+
+    sig, tensor_count = (
+        state_signature(ckpt)
+    )
+
+    print(
+        f"{model:<8} "
+        f"seed={seed} "
+        f"best_iter={best_iter} "
+        f"tensor_count={tensor_count}"
+    )
+
+    print(
+        "  eval_path:",
+        ckpt,
+    )
+
+    records.append(
+        {
+            "model": model,
+            "seed": seed,
+            "best_iter": best_iter,
+            "eval_path":
+                str(ckpt),
+            "matched_training_checkpoint":
+                str(ckpt),
+            "eval_file_sha256":
+                file_sha256(ckpt),
+            "matched_checkpoint_sha256":
+                file_sha256(ckpt),
+            "model_state_sha256":
+                sig,
+            "tensor_count":
+                tensor_count,
+        }
+    )
+
+
+# ------------------------------------------------------------
+# Validate record count
+# ------------------------------------------------------------
+
+assert len(records) == 9
+
+
+# ------------------------------------------------------------
+# Write JSON
+# ------------------------------------------------------------
+
+json_path = (
+    OUT /
+    "checkpoints_manifest.json"
+)
+
+json_path.write_text(
+    json.dumps(
+        records,
+        indent=2,
+    )
+    + "\n"
+)
+
+
+# ------------------------------------------------------------
+# Write TSV
+# ------------------------------------------------------------
+
+tsv_path = (
+    OUT /
+    "checkpoints_manifest.tsv"
+)
+
+with tsv_path.open("w") as f:
+
+    f.write(
+        "model\tseed\tbest_iter\t"
+        "eval_path\t"
+        "matched_training_checkpoint\t"
+        "eval_file_sha256\t"
+        "model_state_sha256\n"
+    )
+
+    for r in records:
+
+        f.write(
+            f"{r['model']}\t"
+            f"{r['seed']}\t"
+            f"{r['best_iter']}\t"
+            f"{r['eval_path']}\t"
+            f"{r['matched_training_checkpoint']}\t"
+            f"{r['eval_file_sha256']}\t"
+            f"{r['model_state_sha256']}\n"
+        )
+
+
+# ------------------------------------------------------------
+# Separate checksum file
+# ------------------------------------------------------------
+
+sha_path = (
+    OUT /
+    "checkpoints_sha256.txt"
+)
+
+with sha_path.open("w") as f:
+
+    for r in records:
+
+        f.write(
+            f"{r['eval_file_sha256']}  "
+            f"{r['eval_path']}\n"
+        )
+
+
+print()
+print("=" * 100)
+print("CHECKPOINT FREEZE CANDIDATES RESOLVED")
+print("=" * 100)
+
+print(json_path)
+print(tsv_path)
+print(sha_path)
