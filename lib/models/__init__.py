@@ -1,3 +1,4 @@
+from .pidnet_s_external import PIDNetSExternal
 
 
 from .bisenetv1 import BiSeNetV1
@@ -19,6 +20,7 @@ from .bisenetv2_boundary_full_bga import (
 
 
 model_factory = {
+    'pidnet_s_external': PIDNetSExternal,
     'bisenetv1': BiSeNetV1,
     'bisenetv2': BiSeNetV2,
 
