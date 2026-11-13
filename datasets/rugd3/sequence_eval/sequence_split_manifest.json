@@ -1,0 +1,46 @@
+{
+  "val": {
+    "source": "datasets/rugd3/val.txt",
+    "source_sha256": "c202c6b88b175de099b775b58a280f2140cbda51cfe2cc5b9dc03b592cf8d70e",
+    "source_count": 1134,
+    "sequences": {
+      "trail-4": {
+        "count": 758,
+        "file": "datasets/rugd3/sequence_eval/val/trail-4.txt",
+        "sha256": "79137b897b388678e6e5eca17816f7ba584d5a5b1df1ee0396325586a953cf34"
+      },
+      "trail-5": {
+        "count": 376,
+        "file": "datasets/rugd3/sequence_eval/val/trail-5.txt",
+        "sha256": "ead6e2919d57b52bb9af30d8986f81bebd958969cb6f77f6ef24cd554827b6e1"
+      }
+    }
+  },
+  "test": {
+    "source": "datasets/rugd3/test.txt",
+    "source_sha256": "60fc08a3063298987c809767624c963c1b59f30b4a38693c01a9460f3281ed47",
+    "source_count": 1408,
+    "sequences": {
+      "trail": {
+        "count": 693,
+        "file": "datasets/rugd3/sequence_eval/test/trail.txt",
+        "sha256": "91dcf4f7385503488b4dd9f298f6bb2105f0487a64e2bdd5b8d4a4fa5dfd45f2"
+      },
+      "trail-10": {
+        "count": 49,
+        "file": "datasets/rugd3/sequence_eval/test/trail-10.txt",
+        "sha256": "1d7f7edbe2ac350563e3a3a2d40979abf893e5ecfa5c2fb43f1b3301bb946627"
+      },
+      "trail-12": {
+        "count": 352,
+        "file": "datasets/rugd3/sequence_eval/test/trail-12.txt",
+        "sha256": "712c0b9b376939122c96744f53e5fe4198c2bfa1e024c1fab0e31e0a0b24bc3f"
+      },
+      "trail-14": {
+        "count": 314,
+        "file": "datasets/rugd3/sequence_eval/test/trail-14.txt",
+        "sha256": "d6978291f4733aeccb0b10d30ed3c1550f231d68f5cd6e5ca04ae5e40c79dafa"
+      }
+    }
+  }
+}
